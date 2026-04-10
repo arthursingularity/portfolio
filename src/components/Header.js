@@ -62,8 +62,8 @@ const navItems = [
 
 export default function Header() {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4">
-      <div className="max-w-md mx-auto bg-[#1a1e24] border border-[rgba(255,255,255,0.06)] rounded-full px-6 py-3 flex items-center justify-around backdrop-blur-xl">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-2">
+      <div className="max-w-md mx-auto bg-[#1a1e24] border border-[rgba(255,255,255,0.06)] rounded-full px-6 py-2 flex items-center justify-around backdrop-blur-xl">
         {navItems.map((item) => (
           <a
             key={item.label}

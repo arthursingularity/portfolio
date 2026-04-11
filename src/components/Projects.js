@@ -1,103 +1,414 @@
+"use client";
+
+import { useState, useRef, useEffect, useCallback } from "react";
+
 const projects = [
   {
-    title: "ERP Industrial",
+    title: "E-Commerce Platform",
     description:
-      "Sistema de gestão empresarial completo com módulos de estoque, produção e financeiro. Dashboard em tempo real com visualização 3D de inventário.",
-    technologies: ["Next.js", "React", "Node.js", "PostgreSQL", "Three.js"],
-    link: "#",
+      "Plataforma de e-commerce completa com painel admin, sistema de pagamentos integrado e gestão de inventário em tempo real.",
+    impact: "Redução de 45% no tempo de carregamento",
+    tech: ["Next.js", "Node.js", "PostgreSQL", "Stripe", "Redis"],
+    category: "Fullstack",
+    year: "2025",
+    links: { github: "#", live: "#" },
   },
   {
-    title: "Plataforma de Manutenção 3D",
+    title: "Dashboard Analytics",
     description:
-      "Aplicação web interativa para visualização e gerenciamento de manutenção industrial com modelos 3D, telemetria em tempo real e controle de ativos.",
-    technologies: ["React Three Fiber", "WebGL", "REST API", "Tailwind CSS"],
-    link: "#",
+      "Dashboard de análise de dados com visualizações interativas, relatórios em PDF e monitoramento de métricas em tempo real via WebSocket.",
+    impact: "Processamento de +50k eventos/dia",
+    tech: ["React", "D3.js", "Express", "MongoDB", "Socket.io"],
+    category: "Frontend",
+    year: "2025",
+    links: { github: "#", live: "#" },
   },
   {
-    title: "Dashboard Analítico",
+    title: "API Gateway Service",
     description:
-      "Painel de controle para análise de dados com gráficos dinâmicos, filtros avançados e exportação de relatórios. Interface responsiva e performática.",
-    technologies: ["Next.js", "Chart.js", "Prisma", "MySQL"],
-    link: "#",
+      "Microserviço de gateway com rate limiting, autenticação JWT, cache distribuído e documentação automática via OpenAPI.",
+    impact: "Latência média de 12ms por request",
+    tech: ["Node.js", "TypeScript", "Docker", "Redis", "Swagger"],
+    category: "Backend",
+    year: "2024",
+    links: { github: "#" },
   },
   {
-    title: "Design System Corporativo",
+    title: "Real-Time Chat App",
     description:
-      "Biblioteca de componentes reutilizáveis com tokens de design, documentação interativa e integração com Storybook para equipes de desenvolvimento.",
-    technologies: ["React", "Tailwind CSS", "Storybook", "Figma"],
-    link: "#",
+      "Aplicação de chat em tempo real com salas, notificações push, compartilhamento de mídia e criptografia end-to-end.",
+    impact: "+200 usuários simultâneos",
+    tech: ["React", "Socket.io", "Node.js", "MongoDB", "AWS S3"],
+    category: "Fullstack",
+    year: "2024",
+    links: { github: "#", live: "#" },
+  },
+  {
+    title: "Design System",
+    description:
+      "Biblioteca de componentes React reutilizáveis com tokens de design, acessibilidade e documentação interativa via Storybook.",
+    impact: "Adotado por 3 equipes internas",
+    tech: ["React", "TypeScript", "Storybook", "Radix UI", "CSS Modules"],
+    category: "Frontend",
+    year: "2024",
+    links: { github: "#" },
   },
 ];
 
 function ArrowIcon() {
   return (
-    <svg
-      className="w-4 h-4"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      strokeWidth={1.5}
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
-      />
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
     </svg>
   );
 }
 
-export default function Projects() {
+function GithubIcon() {
   return (
-    <section id="projects" className="py-32 hidden sm:py-40 px-6 sm:px-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Section header */}
-        <div className="mb-20">
-          <p className="text-[13px] text-accent-muted uppercase tracking-widest mb-4">
-            Projetos Selecionados
-          </p>
-          <h2 className="text-3xl sm:text-4xl font-semibold text-neutral-100 tracking-tight">
-            Trabalho recente
-          </h2>
-        </div>
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
+    </svg>
+  );
+}
 
-        {/* Projects grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {projects.map((project, index) => (
-            <a
-              key={index}
-              href={project.link}
-              className="group relative p-8 rounded-2xl border border-border-subtle bg-card hover:bg-card-hover hover:border-border-hover transition-all duration-500"
-            >
-              {/* Arrow */}
-              <div className="absolute top-8 right-8 text-neutral-600 group-hover:text-accent transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5">
-                <ArrowIcon />
-              </div>
+/**
+ * Circular offset: shortest path from activePos to index around the ring.
+ * activePos can be fractional (e.g. 1.4 during drag).
+ */
+function circularOffset(index, activePos, total) {
+  let diff = index - activePos;
+  while (diff > total / 2) diff -= total;
+  while (diff < -total / 2) diff += total;
+  return diff;
+}
 
-              {/* Content */}
-              <div className="pr-8">
-                <h3 className="text-lg font-medium text-neutral-200 group-hover:text-neutral-100 transition-colors duration-300 mb-3">
-                  {project.title}
-                </h3>
-                <p className="text-[15px] text-neutral-500 leading-relaxed mb-6">
-                  {project.description}
-                </p>
+/**
+ * Interpolate 3D card properties from a continuous offset value.
+ * This creates smooth transitions as offset goes from e.g. 0 to 1.
+ */
+function interpolateCard(offset) {
+  const abs = Math.abs(offset);
+  const sign = offset === 0 ? 0 : offset > 0 ? 1 : -1;
 
-                {/* Tags */}
-                <div className="flex flex-wrap gap-2">
-                  {project.technologies.map((tech) => (
-                    <span
-                      key={tech}
-                      className="text-[12px] text-neutral-500 bg-bg-elevated px-2.5 py-1 rounded-md font-mono tracking-wide"
-                    >
-                      {tech}
+  // Clamp to max visible range
+  if (abs > 2.5) {
+    return { x: sign * 100, scale: 0.35, rotateY: -sign * 55, z: -350, opacity: 0, brightness: 0.15, zIndex: 0, visible: false };
+  }
+
+  // Keyframes:  offset 0 (center),  1 (neighbor),  2 (far)
+  const keyframes = [
+    { abs: 0, x: 0,   scale: 1,    rotateY: 0,   z: 0,    opacity: 1,   brightness: 1,    zIndex: 10 },
+    { abs: 1, x: 65,  scale: 0.68, rotateY: 40,  z: -130, opacity: 0.8, brightness: 0.45, zIndex: 6 },
+    { abs: 2, x: 88,  scale: 0.48, rotateY: 50,  z: -260, opacity: 0.4, brightness: 0.28, zIndex: 3 },
+    { abs: 3, x: 100, scale: 0.35, rotateY: 55,  z: -350, opacity: 0,   brightness: 0.15, zIndex: 0 },
+  ];
+
+  // Find the two keyframes to interpolate between
+  let lo = keyframes[0], hi = keyframes[1];
+  for (let i = 1; i < keyframes.length; i++) {
+    if (abs <= keyframes[i].abs) {
+      lo = keyframes[i - 1];
+      hi = keyframes[i];
+      break;
+    }
+  }
+
+  const t = (abs - lo.abs) / (hi.abs - lo.abs || 1);
+  const lerp = (a, b) => a + (b - a) * t;
+
+  return {
+    x: sign * lerp(lo.x, hi.x),
+    scale: lerp(lo.scale, hi.scale),
+    rotateY: -sign * lerp(lo.rotateY, hi.rotateY),
+    z: lerp(lo.z, hi.z),
+    opacity: lerp(lo.opacity, hi.opacity),
+    brightness: lerp(lo.brightness, hi.brightness),
+    zIndex: Math.round(lerp(lo.zIndex, hi.zIndex)),
+    visible: true,
+  };
+}
+
+export default function Projects() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  // dragOffset: fractional offset applied DURING a drag. 0 when idle.
+  // Negative = dragging right (going to previous), Positive = dragging left (going to next)
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const total = projects.length;
+
+  // How many px of drag = 1 full card transition
+  const DRAG_SENSITIVITY = 150;
+
+  const containerRef = useRef(null);
+  const startXRef = useRef(0);
+
+  const goTo = useCallback(
+    (index) => {
+      setActiveIndex(((index % total) + total) % total);
+      setDragOffset(0);
+    },
+    [total]
+  );
+
+  // Keyboard nav
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === "ArrowRight") goTo(activeIndex + 1);
+      if (e.key === "ArrowLeft") goTo(activeIndex - 1);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activeIndex, goTo]);
+
+  // ── Unified start ──
+  function handleDragStart(clientX) {
+    startXRef.current = clientX;
+    setIsDragging(true);
+    setDragOffset(0);
+  }
+
+  // ── Unified move ──
+  function handleDragMove(clientX) {
+    if (!isDragging) return;
+    const delta = clientX - startXRef.current;
+    // Convert px to fractional card offset
+    // Negative delta (swipe left) = positive offset (go next)
+    setDragOffset(-delta / DRAG_SENSITIVITY);
+  }
+
+  // ── Unified end ──
+  function handleDragEnd() {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    // Snap: if dragged more than 0.3 of a card, commit the move
+    const snapped = Math.round(dragOffset);
+    if (snapped !== 0) {
+      goTo(activeIndex + snapped);
+    } else {
+      setDragOffset(0);
+    }
+  }
+
+  // ── Mouse events ──
+  useEffect(() => {
+    if (!isDragging) return;
+
+    function onMouseMove(e) {
+      handleDragMove(e.clientX);
+    }
+    function onMouseUp() {
+      handleDragEnd();
+    }
+
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  });
+
+  function onMouseDown(e) {
+    e.preventDefault();
+    handleDragStart(e.clientX);
+  }
+
+  // ── Touch events ──
+  function onTouchStart(e) {
+    handleDragStart(e.touches[0].clientX);
+  }
+
+  function onTouchMove(e) {
+    // Prevent vertical scroll while dragging carousel
+    e.preventDefault();
+    handleDragMove(e.touches[0].clientX);
+  }
+
+  function onTouchEnd() {
+    handleDragEnd();
+  }
+
+  // The "effective position" during drag — fractional
+  const effectivePos = activeIndex + dragOffset;
+
+  // Use faster transition when dragging (none), snap transition when releasing
+  const cardTransition = isDragging
+    ? "none"
+    : "transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease, filter 0.35s ease";
+
+  return (
+    <section id="projects" className="relative mt-8 overflow-hidden">
+      {/* Section header */}
+      <div className="mb-6 py-3 px-4">
+        <h2 className="text-[28px] sm:text-3xl font-medium text-neutral-100 leading-tight">
+          Trabalhos em destaque
+        </h2>
+        <p className="text-[14px] text-neutral-400 mt-2 max-w-sm">
+          Projetos selecionados que demonstram minha abordagem técnica e
+          capacidade de resolver problemas reais.
+        </p>
+      </div>
+
+      {/* 3D Carousel */}
+      <div
+        ref={containerRef}
+        className="relative w-full select-none cursor-grab active:cursor-grabbing"
+        style={{
+          perspective: "1200px",
+          height: "380px",
+          touchAction: "pan-y",
+        }}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
+      >
+        <div
+          className="relative w-full h-full flex items-center justify-center"
+          style={{ transformStyle: "preserve-3d" }}
+        >
+          {projects.map((project, index) => {
+            const offset = circularOffset(index, effectivePos, total);
+            const t = interpolateCard(offset);
+
+            if (!t.visible) return null;
+
+            const isCenter = Math.abs(offset) < 0.5;
+
+            return (
+              <article
+                key={project.title}
+                className="absolute left-1/2 top-1/2"
+                style={{
+                  width: "75%",
+                  maxWidth: "320px",
+                  transform: `
+                    translate(-50%, -50%)
+                    translateX(${t.x}%)
+                    translateZ(${t.z}px)
+                    scale(${t.scale})
+                    rotateY(${t.rotateY}deg)
+                  `,
+                  zIndex: t.zIndex,
+                  opacity: t.opacity,
+                  filter: `brightness(${t.brightness})`,
+                  transition: cardTransition,
+                  transformOrigin: "center center",
+                  willChange: "transform, opacity",
+                  pointerEvents: isCenter ? "auto" : "none",
+                }}
+              >
+                <div
+                  className={`rounded-3xl border p-5 backdrop-blur-sm transition-colors duration-300 ${
+                    isCenter
+                      ? "border-[rgba(1,144,255,0.25)] bg-[#1a1e24]"
+                      : "border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/80"
+                  }`}
+                >
+                  {/* Glow behind active */}
+                  {isCenter && (
+                    <div
+                      className="absolute -inset-2 rounded-3xl pointer-events-none -z-10"
+                      style={{
+                        background:
+                          "radial-gradient(ellipse at center, rgba(1,144,255,0.06) 0%, transparent 70%)",
+                      }}
+                    />
+                  )}
+
+                  {/* Category + Year */}
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-[11px] font-medium tracking-[0.15em] uppercase text-accent/70 bg-accent/5 px-2.5 py-1 rounded-full border border-accent/10">
+                      {project.category}
                     </span>
-                  ))}
+                    <span className="text-[12px] text-neutral-500 font-light">
+                      {project.year}
+                    </span>
+                  </div>
+
+                  {/* Title */}
+                  <h3
+                    className={`text-[18px] font-medium mb-2 transition-colors duration-300 ${
+                      isCenter ? "text-neutral-50" : "text-neutral-300"
+                    }`}
+                  >
+                    {project.title}
+                  </h3>
+
+                  {/* Description */}
+                  <p className="text-[13px] text-neutral-400 leading-relaxed mb-3 line-clamp-3">
+                    {project.description}
+                  </p>
+
+                  {/* Impact */}
+                  <div className="flex items-center gap-2 mb-4 text-[12px] text-emerald-400/80">
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
+                    </svg>
+                    <span>{project.impact}</span>
+                  </div>
+
+                  {/* Tech */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {project.tech.map((tech) => (
+                      <span
+                        key={tech}
+                        className="text-[11px] text-neutral-400 bg-[rgba(255,255,255,0.04)] border border-[rgba(255,255,255,0.06)] px-2 py-0.5 rounded-md"
+                      >
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Links */}
+                  <div className="flex items-center gap-3 pt-3 border-t border-[rgba(255,255,255,0.04)]">
+                    {project.links.github && (
+                      <a
+                        href={project.links.github}
+                        className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-neutral-200 transition-colors duration-300"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <GithubIcon />
+                        <span>Código</span>
+                      </a>
+                    )}
+                    {project.links.live && (
+                      <a
+                        href={project.links.live}
+                        className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-accent transition-colors duration-300"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ArrowIcon />
+                        <span>Live Demo</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </a>
-          ))}
+              </article>
+            );
+          })}
         </div>
+      </div>
+
+      {/* Dot indicators */}
+      <div className="flex justify-center gap-2 mt-3 pb-2">
+        {projects.map((_, i) => (
+          <button
+            key={i}
+            aria-label={`Ir para projeto ${i + 1}`}
+            onClick={() => goTo(i)}
+            className={`h-2 rounded-full transition-all duration-300 ${
+              i === activeIndex
+                ? "bg-accent w-6"
+                : "bg-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.3)] w-2"
+            }`}
+          />
+        ))}
       </div>
     </section>
   );

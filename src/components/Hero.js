@@ -9,7 +9,7 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      className="relative min-h-screen flex flex-col p-4"
+      className="relative flex flex-col p-4"
     >
       {/* Profile card */}
       <div className="opacity-0 animate-fade-in-up animate-delay-100 mb-10">
@@ -32,12 +32,12 @@ export default function Hero() {
               </p>
             </div>
           </div>
-          <Cube3D size={35} />
+          <img src='/imagens/logo.svg' className="w-[33px] mr-2"/>
         </div>
       </div>
 
       {/* Main heading */}
-      <h1 className="opacity-0 animate-fade-in-up animate-delay-200 text-[32px] sm:text-4xl lg:text-5xl font-regular text-neutral-100 leading-[1.2] tracking-tight mb-6">
+      <h1 className="opacity-0 mt-8 animate-fade-in-up animate-delay-200 text-[32px] sm:text-4xl lg:text-5xl font-regular text-neutral-100 leading-[1.2] tracking-tight mb-6">
         Desenvolvendo a{" "}
         <span className="text-accent">próxima geração</span> de
         aplicações web de alto nível.
@@ -51,12 +51,11 @@ export default function Hero() {
 
       {/* CTA Button */}
       <div className="opacity-0 animate-fade-in-up animate-delay-400">
-        <a
-          href="#projects"
+        <button
           className="flex items-center justify-center w-full py-3 bg-accent hover:bg-accent-hover text-white text-[15px] font-medium rounded-full transition-all duration-300"
         >
-          Ver projetos
-        </a>
+          Entrar em contato
+        </button>
       </div>
     </section>
   );

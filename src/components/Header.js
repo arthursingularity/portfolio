@@ -1,13 +1,15 @@
 "use client";
 
-function HomeIcon({ active }) {
+import { useState, useEffect } from "react";
+
+function HomeIcon() {
   return (
     <svg
       className="w-6 h-6"
       fill="none"
       viewBox="0 0 24 24"
       stroke="currentColor"
-      strokeWidth={active ? 2 : 1.5}
+      strokeWidth={1.5}
     >
       <path
         strokeLinecap="round"
@@ -36,6 +38,24 @@ function ProjectsIcon() {
   );
 }
 
+function AboutIcon() {
+  return (
+    <svg
+      className="w-6 h-6"
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.5 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"
+      />
+    </svg>
+  );
+}
+
 function ContactIcon() {
   return (
     <svg
@@ -48,36 +68,74 @@ function ContactIcon() {
       <path
         strokeLinecap="round"
         strokeLinejoin="round"
-        d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z"
+        d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75"
       />
     </svg>
   );
 }
 
 const navItems = [
-  { icon: <HomeIcon active />, href: "#hero", label: "Home", active: true },
-  { icon: <ProjectsIcon />, href: "#projects", label: "Projetos" },
-  { icon: <ContactIcon />, href: "#contact", label: "Contato" },
+  { icon: <HomeIcon />, href: "#hero", label: "Home", sectionId: "hero" },
+  { icon: <ProjectsIcon />, href: "#projects", label: "Projetos", sectionId: "projects" },
+  { icon: <AboutIcon />, href: "#about", label: "Sobre", sectionId: "about" },
+  { icon: <ContactIcon />, href: "#contact", label: "Contato", sectionId: "contact" },
 ];
 
 export default function Header() {
+  const [activeSection, setActiveSection] = useState("hero");
+
+  useEffect(() => {
+    const sectionIds = navItems.map((item) => item.sectionId);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the most visible section
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio);
+
+        if (visible.length > 0) {
+          setActiveSection(visible[0].target.id);
+        }
+      },
+      {
+        rootMargin: "-30% 0px -30% 0px",
+        threshold: [0, 0.25, 0.5, 0.75, 1],
+      }
+    );
+
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-2">
-      <div className="max-w-md mx-auto bg-[#1a1e24] border border-[rgba(255,255,255,0.06)] rounded-full px-6 py-2 flex items-center justify-around backdrop-blur-xl">
-        {navItems.map((item) => (
-          <a
-            key={item.label}
-            href={item.href}
-            aria-label={item.label}
-            className={`p-2 rounded-xl transition-colors duration-300 ${
-              item.active
-                ? "text-neutral-100"
-                : "text-neutral-500 hover:text-neutral-300"
-            }`}
-          >
-            {item.icon}
-          </a>
-        ))}
+      <div className="max-w-md mx-auto bg-[#1a1e24]/95 border border-[rgba(255,255,255,0.06)] rounded-full px-6 py-2 flex items-center justify-around backdrop-blur-xl">
+        {navItems.map((item) => {
+          const isActive = activeSection === item.sectionId;
+          return (
+            <a
+              key={item.label}
+              href={item.href}
+              aria-label={item.label}
+              className={`relative p-2 rounded-xl transition-all duration-300 ${
+                isActive
+                  ? "text-accent"
+                  : "text-neutral-500 hover:text-neutral-300"
+              }`}
+            >
+              {item.icon}
+              {/* Active indicator dot */}
+              {isActive && (
+                <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-accent" />
+              )}
+            </a>
+          );
+        })}
       </div>
     </nav>
   );

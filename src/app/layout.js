@@ -10,7 +10,7 @@ const ibmPlexSans = IBM_Plex_Sans({
 export const metadata = {
   title: "Arthur Alves — Desenvolvedor Fullstack",
   description:
-    "Portfólio pessoal de Arthur Alves. Desenvolvedor Fullstack especializado em aplicações web modernas com React, Next.js e Node.js.",
+    "Portfólio pessoal de Arthur Alves. Desenvolvedor Fullstack especializado em JavaScript.",
   keywords: [
     "desenvolvedor",
     "fullstack",

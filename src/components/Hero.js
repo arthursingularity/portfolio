@@ -1,15 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import dynamic from "next/dynamic";
-
-const Cube3D = dynamic(() => import("./Cube3D"), { ssr: false });
 
 export default function Hero() {
   return (
     <section
       id="hero"
-      className="relative flex flex-col p-4"
+      className="relative flex flex-col p-5"
     >
       {/* Profile card */}
       <div className="opacity-0 animate-fade-in-up animate-delay-100 mb-10">

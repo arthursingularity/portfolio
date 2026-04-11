@@ -94,7 +94,7 @@ export default function Contact() {
       {/* Contact form */}
       <form
         onSubmit={handleSubmit}
-        className="space-y-4 rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/80 backdrop-blur-sm p-5"
+        className="space-y-4 rounded-4xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/80 backdrop-blur-sm p-5"
       >
         <div>
           <label

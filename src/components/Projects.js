@@ -1,58 +1,45 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Image from "next/image";
 
 const projects = [
   {
-    title: "E-Commerce Platform",
+    title: "Bruno Duarte Personal",
+    image: "/imagens/projects/brunoduartepersonal.jpg",
     description:
       "Plataforma de e-commerce completa com painel admin, sistema de pagamentos integrado e gestão de inventário em tempo real.",
     impact: "Redução de 45% no tempo de carregamento",
-    tech: ["Next.js", "Node.js", "PostgreSQL", "Stripe", "Redis"],
-    category: "Fullstack",
-    year: "2025",
+    tech: ["Next.js", "EmailJS", "Stripe"],
     links: { github: "#", live: "#" },
   },
   {
-    title: "Dashboard Analytics",
+    title: "Lucas Maia",
+    image: "/imagens/projects/lucas-maia.png",
     description:
       "Dashboard de análise de dados com visualizações interativas, relatórios em PDF e monitoramento de métricas em tempo real via WebSocket.",
     impact: "Processamento de +50k eventos/dia",
     tech: ["React", "D3.js", "Express", "MongoDB", "Socket.io"],
-    category: "Frontend",
-    year: "2025",
     links: { github: "#", live: "#" },
   },
   {
-    title: "API Gateway Service",
+    title: "Comunidade Brasileiros no Texas",
+    image: "/imagens/projects/brasileiros-texas.png",
+    description:
+      "Plataforma de e-commerce completa com painel admin, sistema de pagamentos integrado e gestão de inventário em tempo real.",
+    impact: "Redução de 45% no tempo de carregamento",
+    tech: ["Next.js", "EmailJS", "Stripe"],
+    links: { github: "#", live: "#" },
+  },
+  {
+    title: "Imports Klein",
+    image: "/imagens/projects/imports-klein.png",
     description:
       "Microserviço de gateway com rate limiting, autenticação JWT, cache distribuído e documentação automática via OpenAPI.",
     impact: "Latência média de 12ms por request",
     tech: ["Node.js", "TypeScript", "Docker", "Redis", "Swagger"],
-    category: "Backend",
-    year: "2024",
     links: { github: "#" },
-  },
-  {
-    title: "Real-Time Chat App",
-    description:
-      "Aplicação de chat em tempo real com salas, notificações push, compartilhamento de mídia e criptografia end-to-end.",
-    impact: "+200 usuários simultâneos",
-    tech: ["React", "Socket.io", "Node.js", "MongoDB", "AWS S3"],
-    category: "Fullstack",
-    year: "2024",
-    links: { github: "#", live: "#" },
-  },
-  {
-    title: "Design System",
-    description:
-      "Biblioteca de componentes React reutilizáveis com tokens de design, acessibilidade e documentação interativa via Storybook.",
-    impact: "Adotado por 3 equipes internas",
-    tech: ["React", "TypeScript", "Storybook", "Radix UI", "CSS Modules"],
-    category: "Frontend",
-    year: "2024",
-    links: { github: "#" },
-  },
+  }
 ];
 
 function ArrowIcon() {
@@ -97,10 +84,10 @@ function interpolateCard(offset) {
 
   // Keyframes:  offset 0 (center),  1 (neighbor),  2 (far)
   const keyframes = [
-    { abs: 0, x: 0,   scale: 1,    rotateY: 0,   z: 0,    opacity: 1,   brightness: 1,    zIndex: 10 },
-    { abs: 1, x: 65,  scale: 0.68, rotateY: 40,  z: -130, opacity: 0.8, brightness: 0.45, zIndex: 6 },
-    { abs: 2, x: 88,  scale: 0.48, rotateY: 50,  z: -260, opacity: 0.4, brightness: 0.28, zIndex: 3 },
-    { abs: 3, x: 100, scale: 0.35, rotateY: 55,  z: -350, opacity: 0,   brightness: 0.15, zIndex: 0 },
+    { abs: 0, x: 0, scale: 1, rotateY: 0, z: 0, opacity: 1, brightness: 1, zIndex: 10 },
+    { abs: 1, x: 65, scale: 0.68, rotateY: 40, z: -130, opacity: 0.8, brightness: 0.45, zIndex: 6 },
+    { abs: 2, x: 88, scale: 0.48, rotateY: 50, z: -260, opacity: 0.4, brightness: 0.28, zIndex: 3 },
+    { abs: 3, x: 100, scale: 0.35, rotateY: 55, z: -350, opacity: 0, brightness: 0.15, zIndex: 0 },
   ];
 
   // Find the two keyframes to interpolate between
@@ -256,7 +243,7 @@ export default function Projects() {
         className="relative w-full select-none cursor-grab active:cursor-grabbing"
         style={{
           perspective: "1200px",
-          height: "380px",
+          height: "520px",
           touchAction: "pan-y",
         }}
         onMouseDown={onMouseDown}
@@ -281,8 +268,8 @@ export default function Projects() {
                 key={project.title}
                 className="absolute left-1/2 top-1/2"
                 style={{
-                  width: "75%",
-                  maxWidth: "320px",
+                  width: "90%",
+                  maxWidth: "350px",
                   transform: `
                     translate(-50%, -50%)
                     translateX(${t.x}%)
@@ -300,11 +287,10 @@ export default function Projects() {
                 }}
               >
                 <div
-                  className={`rounded-3xl border p-5 backdrop-blur-sm transition-colors duration-300 ${
-                    isCenter
+                  className={`rounded-4xl border p-5 backdrop-blur-sm transition-colors duration-300 ${isCenter
                       ? "border-[rgba(1,144,255,0.25)] bg-[#1a1e24]"
                       : "border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/80"
-                  }`}
+                    }`}
                 >
                   {/* Glow behind active */}
                   {isCenter && (
@@ -317,21 +303,23 @@ export default function Projects() {
                     />
                   )}
 
-                  {/* Category + Year */}
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-medium tracking-[0.15em] uppercase text-accent/70 bg-accent/5 px-2.5 py-1 rounded-full border border-accent/10">
-                      {project.category}
-                    </span>
-                    <span className="text-[12px] text-neutral-500 font-light">
-                      {project.year}
-                    </span>
-                  </div>
+                  {/* Project image */}
+                  {project.image && (
+                    <div className="relative w-full h-[160px] rounded-2xl overflow-hidden mb-4 bg-[rgba(255,255,255,0.02)]">
+                      <Image
+                        src={project.image}
+                        alt={project.title}
+                        fill
+                        className="object-cover"
+                        sizes="350px"
+                      />
+                    </div>
+                  )}
 
                   {/* Title */}
                   <h3
-                    className={`text-[18px] font-medium mb-2 transition-colors duration-300 ${
-                      isCenter ? "text-neutral-50" : "text-neutral-300"
-                    }`}
+                    className={`text-[18px] font-medium mb-2 transition-colors duration-300 ${isCenter ? "text-neutral-50" : "text-neutral-300"
+                      }`}
                   >
                     {project.title}
                   </h3>
@@ -362,31 +350,36 @@ export default function Projects() {
                   </div>
 
                   {/* Links */}
-                  <div className="flex items-center gap-3 pt-3 border-t border-[rgba(255,255,255,0.04)]">
-                    {project.links.github && (
-                      <a
-                        href={project.links.github}
-                        className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-neutral-200 transition-colors duration-300"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <GithubIcon />
-                        <span>Código</span>
-                      </a>
-                    )}
-                    {project.links.live && (
-                      <a
-                        href={project.links.live}
-                        className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-accent transition-colors duration-300"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ArrowIcon />
-                        <span>Live Demo</span>
-                      </a>
-                    )}
+                  <div className="flex justify-between pt-5 border-t border-[rgba(255,255,255,0.04)]">
+                    <div className="flex items-center gap-3 ">
+                      {project.links.github && (
+                        <a
+                          href={project.links.github}
+                          className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-neutral-200 transition-colors duration-300"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GithubIcon />
+                          <span>Código</span>
+                        </a>
+                      )}
+                      {project.links.live && (
+                        <a
+                          href={project.links.live}
+                          className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-accent transition-colors duration-300"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <ArrowIcon />
+                          <span>Live Demo</span>
+                        </a>
+                      )}
+                    </div>
+                    <button className="bg-accent font-light text-[14px] px-4 py-1 rounded-full">
+                      Conferir
+                    </button>
                   </div>
                 </div>
               </article>
@@ -402,11 +395,10 @@ export default function Projects() {
             key={i}
             aria-label={`Ir para projeto ${i + 1}`}
             onClick={() => goTo(i)}
-            className={`h-2 rounded-full transition-all duration-300 ${
-              i === activeIndex
+            className={`h-2 rounded-full transition-all duration-300 ${i === activeIndex
                 ? "bg-accent w-6"
                 : "bg-[rgba(255,255,255,0.15)] hover:bg-[rgba(255,255,255,0.3)] w-2"
-            }`}
+              }`}
           />
         ))}
       </div>

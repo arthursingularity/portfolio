@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
+import useScrollReveal from "@/hooks/useScrollReveal";
 
 const projects = [
   {
@@ -117,6 +118,7 @@ function interpolateCard(offset) {
 
 export default function Projects() {
   const [activeIndex, setActiveIndex] = useState(0);
+  const revealRef = useScrollReveal();
   // dragOffset: fractional offset applied DURING a drag. 0 when idle.
   // Negative = dragging right (going to previous), Positive = dragging left (going to next)
   const [dragOffset, setDragOffset] = useState(0);
@@ -227,11 +229,11 @@ export default function Projects() {
   return (
     <section id="projects" className="relative mt-8 overflow-hidden">
       {/* Section header */}
-      <div className="mb-6 py-3 px-4">
-        <h2 className="text-[28px] sm:text-3xl font-medium text-neutral-100 leading-tight">
+      <div className="mb-6 py-3 px-4" ref={revealRef}>
+        <h2 className="text-[28px] sm:text-3xl font-medium text-neutral-100 leading-tight" data-reveal>
           Trabalhos em destaque
         </h2>
-        <p className="text-[14px] text-neutral-400 mt-2 max-w-sm">
+        <p className="text-[14px] text-neutral-400 mt-2 max-w-sm" data-reveal data-reveal-delay="100">
           Projetos selecionados que demonstram minha abordagem técnica e
           capacidade de resolver problemas reais.
         </p>

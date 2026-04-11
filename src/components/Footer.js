@@ -1,11 +1,16 @@
+"use client";
+
+import useScrollReveal from "@/hooks/useScrollReveal";
+
 export default function Footer() {
   const currentYear = new Date().getFullYear();
+  const revealRef = useScrollReveal();
 
   return (
-    <footer className="relative px-4 pb-24 pt-10">
+    <footer className="relative px-4 pb-24 pt-10" ref={revealRef}>
       <div className="border-t border-[rgba(255,255,255,0.06)] pt-8">
         {/* Top row */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center justify-between mb-6" data-reveal>
           <div className="flex items-center gap-2">
             <img src="/imagens/logo.svg" className="w-5 h-5" alt="Logo" />
             <span className="text-[14px] font-medium text-neutral-300">
@@ -34,7 +39,7 @@ export default function Footer() {
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6">
+        <div className="flex flex-wrap gap-x-6 gap-y-2 mb-6" data-reveal data-reveal-delay="100">
           {[
             { label: "Projetos", href: "#projects" },
             { label: "Sobre", href: "#about" },
@@ -52,7 +57,7 @@ export default function Footer() {
         </div>
 
         {/* Copyright */}
-        <p className="text-[12px] text-neutral-600">
+        <p className="text-[12px] text-neutral-600" data-reveal data-reveal-delay="200">
           © {currentYear} Arthur Alves. Todos os direitos reservados.
         </p>
       </div>

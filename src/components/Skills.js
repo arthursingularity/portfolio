@@ -1,5 +1,7 @@
 "use client";
 
+import useScrollReveal from "@/hooks/useScrollReveal";
+
 const categories = [
   {
     name: "Frontend",
@@ -78,10 +80,12 @@ function getLevelColor(level) {
 }
 
 export default function Skills() {
+  const revealRef = useScrollReveal();
+
   return (
-    <section id="skills" className="relative px-4 py-20">
+    <section id="skills" className="relative px-4 py-20" ref={revealRef}>
       {/* Section header */}
-      <div className="mb-12">
+      <div className="mb-12" data-reveal>
         <div className="flex items-center gap-3 mb-4">
           <div className="w-2 h-2 rounded-full bg-accent" />
           <span className="text-[13px] font-medium tracking-[0.2em] uppercase text-accent">
@@ -99,8 +103,8 @@ export default function Skills() {
 
       {/* Categories */}
       <div className="space-y-6">
-        {categories.map((category) => (
-          <div key={category.name}>
+        {categories.map((category, catIndex) => (
+          <div key={category.name} data-reveal data-reveal-delay={String(catIndex * 200)}>
             {/* Category header */}
             <div className="flex items-center gap-2 mb-3">
               <div className="text-accent/70">{category.icon}</div>

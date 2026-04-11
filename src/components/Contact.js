@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import useScrollReveal from "@/hooks/useScrollReveal";
 
 const socialLinks = [
   {
@@ -39,6 +40,7 @@ export default function Contact() {
     message: "",
   });
   const [status, setStatus] = useState(null); // 'sending' | 'sent' | 'error'
+  const revealRef = useScrollReveal();
 
   function handleChange(e) {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -57,9 +59,9 @@ export default function Contact() {
   }
 
   return (
-    <section id="contact" className="relative px-4 py-20">
+    <section id="contact" className="relative px-4 py-20" ref={revealRef}>
       {/* Section header */}
-      <div className="mb-10">
+      <div className="mb-10" data-reveal>
         <div className="flex items-center gap-3 mb-4">
           <div className="w-2 h-2 rounded-full bg-accent" />
           <span className="text-[13px] font-medium tracking-[0.2em] uppercase text-accent">
@@ -77,7 +79,7 @@ export default function Contact() {
 
       {/* Social links */}
       <div className="flex gap-3 mb-8">
-        {socialLinks.map((link) => (
+        {socialLinks.map((link, i) => (
           <a
             key={link.name}
             href={link.href}
@@ -85,6 +87,8 @@ export default function Contact() {
             rel="noopener noreferrer"
             aria-label={link.name}
             className="flex items-center justify-center w-11 h-11 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/50 text-neutral-400 hover:text-accent hover:border-[rgba(1,144,255,0.2)] transition-all duration-300"
+            data-reveal="scale"
+            data-reveal-delay={String((i + 1) * 100)}
           >
             {link.icon}
           </a>
@@ -95,6 +99,8 @@ export default function Contact() {
       <form
         onSubmit={handleSubmit}
         className="space-y-4 rounded-4xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/80 backdrop-blur-sm p-5"
+        data-reveal
+        data-reveal-delay="200"
       >
         <div>
           <label

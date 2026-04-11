@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import useScrollReveal from "@/hooks/useScrollReveal";
 
 const stats = [
   { value: "2+", label: "Anos de experiência" },
@@ -39,10 +40,12 @@ const values = [
 ];
 
 export default function About() {
+  const revealRef = useScrollReveal();
+
   return (
-    <section id="about" className="relative px-4 py-20">
+    <section id="about" className="relative px-4 py-20" ref={revealRef}>
       {/* Section header */}
-      <div className="mb-10">
+      <div className="mb-10" data-reveal>
         <div className="flex items-center gap-3 mb-4">
           <div className="w-2 h-2 rounded-full bg-accent" />
           <span className="text-[13px] font-medium tracking-[0.2em] uppercase text-accent">
@@ -55,7 +58,7 @@ export default function About() {
       </div>
 
       {/* Story */}
-      <div className="mb-10">
+      <div className="mb-10" data-reveal data-reveal-delay="100">
         <div className="rounded-3xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/80 backdrop-blur-sm p-5">
           <div className="flex items-start gap-4 mb-5">
             <Image
@@ -95,10 +98,12 @@ export default function About() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 mb-10">
-        {stats.map((stat) => (
+        {stats.map((stat, i) => (
           <div
             key={stat.label}
             className="text-center py-4 px-2 rounded-2xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/50"
+            data-reveal="scale"
+            data-reveal-delay={String((i + 1) * 100)}
           >
             <span className="block text-[24px] font-semibold text-accent mb-1">
               {stat.value}
@@ -112,13 +117,15 @@ export default function About() {
 
       {/* Values / Philosophy */}
       <div className="space-y-3">
-        <h3 className="text-[14px] font-medium text-neutral-300 tracking-wide mb-4">
+        <h3 className="text-[14px] font-medium text-neutral-300 tracking-wide mb-4" data-reveal>
           Minha filosofia
         </h3>
-        {values.map((value) => (
+        {values.map((value, i) => (
           <div
             key={value.title}
             className="flex items-start gap-4 p-4 rounded-xl border border-[rgba(255,255,255,0.06)] bg-[#1a1e24]/40 hover:border-[rgba(1,144,255,0.15)] transition-all duration-300"
+            data-reveal
+            data-reveal-delay={String((i + 1) * 150)}
           >
             <div className="shrink-0 w-9 h-9 rounded-lg bg-accent/5 border border-accent/10 flex items-center justify-center text-accent">
               {value.icon}

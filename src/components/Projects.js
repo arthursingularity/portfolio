@@ -230,7 +230,7 @@ export default function Projects() {
     <section id="projects" className="relative mt-8 overflow-hidden">
       {/* Section header */}
       <div className="mb-6 py-3 px-4" ref={revealRef}>
-        <h2 className="text-[24px] sm:text-3xl font-medium text-neutral-100 leading-tight" data-reveal>
+        <h2 className="text-[24px] sm:text-3xl font-regular text-neutral-100 leading-tight" data-reveal>
           Trabalhos em destaque
         </h2>
         <p className="text-[14px] text-neutral-400 mt-2 max-w-sm" data-reveal data-reveal-delay="100">
@@ -271,7 +271,7 @@ export default function Projects() {
                 className="absolute left-1/2 top-1/2"
                 style={{
                   width: "90%",
-                  maxWidth: "350px",
+                  maxWidth: "360px",
                   transform: `
                     translate(-50%, -50%)
                     translateX(${t.x}%)
@@ -307,7 +307,7 @@ export default function Projects() {
 
                   {/* Project image */}
                   {project.image && (
-                    <div className="relative w-full h-[160px] rounded-2xl overflow-hidden mb-4 bg-[rgba(255,255,255,0.02)]">
+                    <div className="relative w-full h-[170px] rounded-2xl overflow-hidden mb-4 bg-[rgba(255,255,255,0.02)]">
                       <Image
                         src={project.image}
                         alt={project.title}

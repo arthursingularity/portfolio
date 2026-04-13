@@ -227,7 +227,7 @@ export default function Projects() {
     : "transform 0.45s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease, filter 0.35s ease";
 
   return (
-    <section id="projects" className="relative mt-8 overflow-hidden">
+    <section id="projects" className="relative mt-20 overflow-hidden">
       {/* Section header */}
       <div className="mb-6 py-3 px-4" ref={revealRef}>
         <h2 className="text-[24px] sm:text-3xl font-regular text-neutral-100 leading-tight" data-reveal>
@@ -307,7 +307,7 @@ export default function Projects() {
 
                   {/* Project image */}
                   {project.image && (
-                    <div className="relative w-full h-[170px] rounded-2xl overflow-hidden mb-4 bg-[rgba(255,255,255,0.02)]">
+                    <div className="relative w-full h-[230px] rounded-2xl overflow-hidden mb-4 bg-[rgba(255,255,255,0.02)]">
                       <Image
                         src={project.image}
                         alt={project.title}

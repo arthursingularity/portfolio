@@ -6,35 +6,10 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      className="relative flex flex-col p-5 pt-8 pb-6 overflow-hidden"
+      className="relative flex flex-col p-5 pt-[130px] pb-6 overflow-hidden"
     >
-
       {/* Content layer */}
       <div className="relative z-10 flex flex-col">
-        {/* Profile card */}
-        <div className="opacity-0 animate-fade-in-up animate-delay-100 mb-10">
-          <div className="flex justify-between w-full items-center bg-[#1a1e24]/80 backdrop-blur-sm rounded-full px-3.5 py-3 border border-[rgba(255,255,255,0.06)]">
-            <div className="flex space-x-3">
-              <Image
-                src="/imagens/profile.png"
-                alt="Arthur Alves"
-                width={40}
-                height={40}
-                className="rounded-full object-cover shrink-0"
-                priority
-              />
-              <div className="flex flex-col justify-center gap-[5px]">
-                <p className="text-[19px] font-regular text-neutral-100 leading-none">
-                  Arthur Alves
-                </p>
-                <p className="text-[12px] font-regular text-[#C9D4E4] leading-none">
-                  Desenvolvedor Fullstack
-                </p>
-              </div>
-            </div>
-            <img src='/imagens/logo.svg' className="w-[28px] mr-1"/>
-          </div>
-        </div>
 
         {/* Main heading */}
         <h1 className="opacity-0 mt-5 animate-fade-in-up animate-delay-200 text-[36px] sm:text-4xl lg:text-5xl font-regular text-neutral-100 leading-[1.2] tracking-tight mb-6">

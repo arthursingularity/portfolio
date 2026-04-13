@@ -16,7 +16,7 @@ const projects = [
   },
   {
     title: "Lucas Maia",
-    image: "/imagens/projects/brunoduartepersonal.jpg",
+    image: "/imagens/projects/lucasmaia.jpg",
     description:
       "Dashboard de análise de dados com visualizações interativas, relatórios em PDF e monitoramento de métricas em tempo real via WebSocket.",
     impact: "Processamento de +50k eventos/dia",

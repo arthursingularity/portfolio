@@ -11,12 +11,12 @@ const projects = [
     description:
       "Plataforma de e-commerce completa com painel admin, sistema de pagamentos integrado e gestão de inventário em tempo real.",
     impact: "Redução de 45% no tempo de carregamento",
-    tech: ["Next.js", "EmailJS", "Stripe"],
+    tech: ["Next.js", "Tailwind CSS", "EmailJS", "Stripe"],
     links: { github: "#", live: "#" },
   },
   {
     title: "Lucas Maia",
-    image: "/imagens/projects/lucas-maia.png",
+    image: "/imagens/projects/brunoduartepersonal.jpg",
     description:
       "Dashboard de análise de dados com visualizações interativas, relatórios em PDF e monitoramento de métricas em tempo real via WebSocket.",
     impact: "Processamento de +50k eventos/dia",
@@ -25,7 +25,7 @@ const projects = [
   },
   {
     title: "Comunidade Brasileiros no Texas",
-    image: "/imagens/projects/brasileiros-texas.png",
+    image: "/imagens/projects/brunoduartepersonal.jpg",
     description:
       "Plataforma de e-commerce completa com painel admin, sistema de pagamentos integrado e gestão de inventário em tempo real.",
     impact: "Redução de 45% no tempo de carregamento",
@@ -34,7 +34,7 @@ const projects = [
   },
   {
     title: "Imports Klein",
-    image: "/imagens/projects/imports-klein.png",
+    image: "/imagens/projects/brunoduartepersonal.jpg",
     description:
       "Microserviço de gateway com rate limiting, autenticação JWT, cache distribuído e documentação automática via OpenAPI.",
     impact: "Latência média de 12ms por request",
@@ -230,7 +230,7 @@ export default function Projects() {
     <section id="projects" className="relative mt-8 overflow-hidden">
       {/* Section header */}
       <div className="mb-6 py-3 px-4" ref={revealRef}>
-        <h2 className="text-[28px] sm:text-3xl font-medium text-neutral-100 leading-tight" data-reveal>
+        <h2 className="text-[24px] sm:text-3xl font-medium text-neutral-100 leading-tight" data-reveal>
           Trabalhos em destaque
         </h2>
         <p className="text-[14px] text-neutral-400 mt-2 max-w-sm" data-reveal data-reveal-delay="100">
@@ -331,14 +331,6 @@ export default function Projects() {
                     {project.description}
                   </p>
 
-                  {/* Impact */}
-                  <div className="flex items-center gap-2 mb-4 text-[12px] text-emerald-400/80">
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941" />
-                    </svg>
-                    <span>{project.impact}</span>
-                  </div>
-
                   {/* Tech */}
                   <div className="flex flex-wrap gap-1.5 mb-4">
                     {project.tech.map((tech) => (
@@ -357,25 +349,13 @@ export default function Projects() {
                       {project.links.github && (
                         <a
                           href={project.links.github}
-                          className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-neutral-200 transition-colors duration-300"
+                          className="flex border border-[rgba(255,255,255,0.06)] rounded-full p-1 px-1.5 pr-2 items-center gap-1.5 text-[12px] text-neutral-500 hover:text-neutral-200 transition-colors duration-300"
                           target="_blank"
                           rel="noopener noreferrer"
                           onClick={(e) => e.stopPropagation()}
                         >
                           <GithubIcon />
-                          <span>Código</span>
-                        </a>
-                      )}
-                      {project.links.live && (
-                        <a
-                          href={project.links.live}
-                          className="flex items-center gap-1.5 text-[12px] text-neutral-500 hover:text-accent transition-colors duration-300"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <ArrowIcon />
-                          <span>Live Demo</span>
+                          <span>Github</span>
                         </a>
                       )}
                     </div>

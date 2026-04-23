@@ -3,7 +3,7 @@ const nextConfig = {
   /* config options here */
   reactCompiler: true,
   transpilePackages: ["three", "@react-three/fiber", "@react-three/drei"],
-  allowedDevOrigins: ["10.0.0.74"],
+  allowedDevOrigins: ["10.0.0.73"],
 };
 
 export default nextConfig;

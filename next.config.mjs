@@ -4,6 +4,9 @@ const nextConfig = {
   reactCompiler: true,
   transpilePackages: ["three", "@react-three/fiber", "@react-three/drei"],
   allowedDevOrigins: ["10.0.0.73"],
+  typescript: {
+    ignoreBuildErrors: false,
+  },
 };
 
 export default nextConfig;

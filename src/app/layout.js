@@ -1,14 +1,18 @@
-import { IBM_Plex_Sans } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
-const ibmPlexSans = IBM_Plex_Sans({
-  variable: "--font-ibm-plex-sans",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
+});
+
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
 });
 
 export const metadata = {
-  title: "Arthur Alves — Desenvolvedor Fullstack",
+  title: "Arthur Development Workspace",
   description:
     "Portfólio pessoal de Arthur Alves. Desenvolvedor Fullstack especializado em JavaScript.",
   keywords: [
@@ -22,7 +26,7 @@ export const metadata = {
   ],
   authors: [{ name: "Arthur Alves" }],
   openGraph: {
-    title: "Arthur Alves — Desenvolvedor Fullstack",
+    title: "Arthur Development Workspace",
     description:
       "Portfólio pessoal de Arthur Alves. Desenvolvedor Fullstack especializado em aplicações web modernas.",
     type: "website",
@@ -39,7 +43,7 @@ export default function RootLayout({ children }) {
   return (
     <html
       lang="pt-BR"
-      className={`${ibmPlexSans.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="noise-overlay min-h-full flex flex-col">{children}</body>
     </html>

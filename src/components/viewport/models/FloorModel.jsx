@@ -22,12 +22,6 @@ export default function FloorModel({
         metalness: 0.05,
         wireframe,
       }),
-      yellowLine: new THREE.MeshStandardMaterial({
-        color: "#eab308",
-        roughness: 0.4,
-        metalness: 0.1,
-        wireframe,
-      }),
       darkBorder: new THREE.MeshStandardMaterial({
         color: "#3f3f46",
         roughness: 0.9,
@@ -51,44 +45,6 @@ export default function FloorModel({
       <mesh material={materials.concrete} receiveShadow>
         <boxGeometry args={[safeW, fixedThickness, safeD]} />
       </mesh>
-
-      {/* Safety Yellow Demarcation Lines along edges */}
-      {showDemarcation && (
-        <group position={[0, fixedThickness / 2 + 0.001, 0]}>
-          {/* North Line */}
-          <mesh
-            position={[0, 0, -halfD + lineWidth / 2 + 0.2]}
-            material={materials.yellowLine}
-            receiveShadow
-          >
-            <boxGeometry args={[Math.max(0.1, safeW - 0.4), 0.002, lineWidth]} />
-          </mesh>
-          {/* South Line */}
-          <mesh
-            position={[0, 0, halfD - lineWidth / 2 - 0.2]}
-            material={materials.yellowLine}
-            receiveShadow
-          >
-            <boxGeometry args={[Math.max(0.1, safeW - 0.4), 0.002, lineWidth]} />
-          </mesh>
-          {/* East Line */}
-          <mesh
-            position={[halfW - lineWidth / 2 - 0.2, 0, 0]}
-            material={materials.yellowLine}
-            receiveShadow
-          >
-            <boxGeometry args={[lineWidth, 0.002, Math.max(0.1, safeD - 0.4)]} />
-          </mesh>
-          {/* West Line */}
-          <mesh
-            position={[-halfW + lineWidth / 2 + 0.2, 0, 0]}
-            material={materials.yellowLine}
-            receiveShadow
-          >
-            <boxGeometry args={[lineWidth, 0.002, Math.max(0.1, safeD - 0.4)]} />
-          </mesh>
-        </group>
-      )}
     </group>
   );
 }

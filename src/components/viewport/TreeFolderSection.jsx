@@ -13,12 +13,14 @@ import { Icon } from "@iconify/react";
  * - Eye icon toggle for hide/show in 3D scene
  * - Quick delete / duplicate actions
  */
-export default function SceneOutliner({
+export default function TreeFolderSection({
   items = [],
   selectedId,
+  selectedIds = [],
   onSelect,
   onToggleVisibility,
   onDuplicate,
+  onUpdateName,
   onSave,
   saveStatus = "idle",
   saveMessage = "",
@@ -29,6 +31,21 @@ export default function SceneOutliner({
   const [collectionExpanded, setCollectionExpanded] = useState(true);
   const [isEditingName, setIsEditingName] = useState(false);
   const [tempName, setTempName] = useState(projectName || "setor_principal");
+  const [editingItemId, setEditingItemId] = useState(null);
+  const [tempItemName, setTempItemName] = useState("");
+
+  const commitItemName = (id, currentName) => {
+    const val = tempItemName.trim();
+    if (val && val !== currentName) {
+      onUpdateName?.(id, val);
+    }
+    setEditingItemId(null);
+  };
+
+  const startEditing = (id, currentName) => {
+    setEditingItemId(id);
+    setTempItemName(currentName || "");
+  };
 
   // Filter items by search query
   const filteredItems = useMemo(() => {
@@ -162,13 +179,18 @@ export default function SceneOutliner({
                 </div>
               ) : (
                 filteredItems.map((item) => {
-                  const isSelected = item.id === selectedId;
+                  const isSelected =
+                    selectedIds && selectedIds.length > 0
+                      ? selectedIds.includes(item.id)
+                      : item.id === selectedId;
                   const isHidden = item.hidden;
 
                   return (
                     <div
                       key={item.id}
-                      onClick={() => onSelect(item.id)}
+                      onClick={(e) =>
+                        onSelect(item.id, e.shiftKey || e.ctrlKey || e.metaKey)
+                      }
                       className={`group flex items-center justify-between pl-9 pr-2.5 py-1 cursor-pointer border-l-2 ${
                         isSelected
                           ? "bg-[#284968] text-white border-blue-400"
@@ -178,21 +200,63 @@ export default function SceneOutliner({
                       {/* Item icon and name */}
                       <div className="flex items-center gap-2 min-w-0 flex-1">
                         {getItemIcon(item.type)}
-                        <span
-                          className={`truncate text-[11px] ${
-                            isHidden
-                              ? "opacity-50"
-                              : isSelected
+                        {editingItemId === item.id ? (
+                          <input
+                            type="text"
+                            value={tempItemName}
+                            autoFocus
+                            onClick={(e) => e.stopPropagation()}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => setTempItemName(e.target.value)}
+                            onBlur={() => commitItemName(item.id, item.name)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                commitItemName(item.id, item.name);
+                              } else if (e.key === "Escape") {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setEditingItemId(null);
+                              }
+                            }}
+                            className="bg-black/90 border border-blue-400 rounded px-1.5 py-0.5 text-[11px] text-white outline-none w-full font-medium"
+                          />
+                        ) : (
+                          <span
+                            onDoubleClick={(e) => {
+                              e.stopPropagation();
+                              startEditing(item.id, item.name);
+                            }}
+                            title="Clique duas vezes para renomear"
+                            className={`truncate text-[11px] cursor-pointer hover:underline ${
+                              isHidden
+                                ? "opacity-50"
+                                : isSelected
                                 ? "font-medium text-white"
                                 : "text-white/80"
-                          }`}
-                        >
-                          {item.name}
-                        </span>
+                            }`}
+                          >
+                            {item.name}
+                          </span>
+                        )}
                       </div>
 
-                      {/* Quick Actions (Eye toggle visibility & Delete) */}
-                      <div className="flex items-center gap-1.5 shrink-0 opacity-70 group-hover:opacity-100">
+                      {/* Quick Actions (Rename & Eye toggle visibility) */}
+                      <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100">
+                        {/* Botão de Renomear */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditing(item.id, item.name);
+                          }}
+                          className="p-1 rounded hover:bg-white/20 text-white/50 hover:text-white cursor-pointer"
+                          title="Renomear modelo"
+                        >
+                          <Icon icon="lucide:pencil" className="text-[11px]" />
+                        </button>
+
                         {/* Toggle 3D Visibility */}
                         <button
                           type="button"

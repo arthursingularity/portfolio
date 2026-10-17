@@ -16,8 +16,11 @@ export default function SceneCanvas({
   gridVisible = true,
   items = [],
   selectedId = null,
+  selectedIds = [],
+  selectedItems = [],
   onSelect = () => {},
   onUpdateTransform = () => {},
+  onUpdateTransforms = () => {},
   transformMode = "translate",
   snapToGrid = true,
   controlsRef,
@@ -27,15 +30,30 @@ export default function SceneCanvas({
   const activeControls = controlsRef || localControlsRef;
   const localExportRef = useRef(null);
   const activeExportRef = exportGroupRef || localExportRef;
+  const targetRegistryRef = useRef({});
 
   const [modalActive, setModalActive] = useState(false);
   const [modalInfo, setModalInfo] = useState(null);
+  const [hoveredId, setHoveredId] = useState(null);
 
   const selectedItem = items.find((it) => it.id === selectedId);
+  const activeSelectedIds =
+    selectedIds && selectedIds.length > 0
+      ? selectedIds
+      : selectedId
+      ? [selectedId]
+      : [];
+  const activeSelectedItems =
+    selectedItems && selectedItems.length > 0
+      ? selectedItems
+      : selectedItem
+      ? [selectedItem]
+      : [];
 
   return (
     <div
       className="relative w-full h-full select-none overflow-hidden"
+      onPointerLeave={() => setHoveredId(null)}
       style={{
         background:
           "radial-gradient(ellipse at 50% 45%, #46464a 0%, #38383c 60%, #2e2e32 100%)",
@@ -49,11 +67,11 @@ export default function SceneCanvas({
             {modalInfo.axisLock === "x" && (
               <span className="text-[#f87171]">Mover [Eixo X]: ΔX = {modalInfo.delta.dx}m</span>
             )}
-            {modalInfo.axisLock === "y" && (
-              <span className="text-[#4ade80]">Mover [Eixo Y / Altura]: ΔY = {modalInfo.delta.dy}m</span>
-            )}
             {modalInfo.axisLock === "z" && (
-              <span className="text-[#60a5fa]">Mover [Eixo Z / Profundidade]: ΔZ = {modalInfo.delta.dz}m</span>
+              <span className="text-[#60a5fa]">Mover [Eixo Z / Altura]: ΔZ = {modalInfo.delta.dy}m</span>
+            )}
+            {modalInfo.axisLock === "y" && (
+              <span className="text-[#4ade80]">Mover [Eixo Y / Profundidade]: ΔY = {modalInfo.delta.dz}m</span>
             )}
             {!modalInfo.axisLock && (
               <span className="text-neutral-200">
@@ -81,7 +99,10 @@ export default function SceneCanvas({
           alpha: true,
         }}
         className="w-full h-full"
-        onPointerMissed={() => onSelect(null)}
+        onPointerMissed={() => {
+          onSelect(null);
+          setHoveredId(null);
+        }}
       >
         {/* Balanced Industrial Lighting sem sombras */}
         <ambientLight intensity={0.8} />
@@ -115,9 +136,18 @@ export default function SceneCanvas({
             <EditableItem
               key={item.id}
               item={item}
-              isSelected={item.id === selectedId}
+              isSelected={activeSelectedIds.includes(item.id)}
+              isPrimarySelected={item.id === selectedId}
+              isHovered={item.id === hoveredId}
+              onPointerOverItem={(id) => setHoveredId(id)}
+              onPointerOutItem={(id) =>
+                setHoveredId((cur) => (cur === id ? null : cur))
+              }
               onSelect={onSelect}
               onUpdateTransform={onUpdateTransform}
+              onUpdateTransforms={onUpdateTransforms}
+              selectedItems={activeSelectedItems}
+              targetRegistryRef={targetRegistryRef}
               transformMode={transformMode}
               snapToGrid={snapToGrid}
               gridSnapSize={0.1}
@@ -130,7 +160,10 @@ export default function SceneCanvas({
         {/* Blender Modal Move (G + Axis X/Y/Z + Mouse Move) */}
         <BlenderModalTransform
           selectedItem={selectedItem}
+          selectedItems={activeSelectedItems}
           onUpdateTransform={onUpdateTransform}
+          onUpdateTransforms={onUpdateTransforms}
+          targetRegistryRef={targetRegistryRef}
           snapToGrid={snapToGrid}
           gridSnapSize={0.1}
           orbitControlsRef={activeControls}
@@ -159,6 +192,7 @@ export default function SceneCanvas({
         <GizmoHelper alignment="top-right" margin={[65, 65]}>
           <GizmoViewport
             axisColors={["#e03535", "#3b82f6", "#52b536"]}
+            labels={["X", "Z", "Y"]}
             labelColor="#ffffff"
           />
         </GizmoHelper>

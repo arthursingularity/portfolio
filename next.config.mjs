@@ -7,6 +7,9 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: false,
   },
+  devIndicators: {
+    buildActivity: false,
+  },
 };
 
 export default nextConfig;

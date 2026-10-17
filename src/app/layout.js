@@ -11,6 +11,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+{/*
 export const metadata = {
   title: "Arthur Development Workspace",
   description:
@@ -32,6 +33,8 @@ export const metadata = {
     type: "website",
   },
 };
+
+*/}
 
 export const viewport = {
   width: "device-width",

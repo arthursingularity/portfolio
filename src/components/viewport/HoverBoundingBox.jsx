@@ -44,10 +44,12 @@ export default function HoverBoundingBox({ target, itemProps, color = "#38bdf8" 
     localBox.getSize(size);
     localBox.getCenter(center);
 
-    const padding = 0.04;
-    const sx = Math.max(0.1, size.x + padding);
-    const sy = Math.max(0.04, size.y + padding);
-    const sz = Math.max(0.1, size.z + padding);
+    const padX = 0.006;
+    const padY = 0.016;
+    const padZ = 0.016;
+    const sx = Math.max(0.1, size.x + padX);
+    const sy = Math.max(0.04, size.y + padY);
+    const sz = Math.max(0.1, size.z + padZ);
 
     const boxGeom = new THREE.BoxGeometry(sx, sy, sz);
     const edgesGeom = new THREE.EdgesGeometry(boxGeom);
@@ -66,9 +68,10 @@ export default function HoverBoundingBox({ target, itemProps, color = "#38bdf8" 
       name="__helper_hover_box"
       userData={{ isHelper: true }}
       position={boxData.center}
+      raycast={() => null}
     >
-      {/* 12-edge clean wireframe outline */}
-      <lineSegments geometry={boxData.edgesGeom}>
+      {/* 12-edge clean wireframe outline (raycast disabled so it never interferes with hover) */}
+      <lineSegments geometry={boxData.edgesGeom} raycast={() => null}>
         <lineBasicMaterial
           color={color}
           linewidth={2}
@@ -78,8 +81,8 @@ export default function HoverBoundingBox({ target, itemProps, color = "#38bdf8" 
         />
       </lineSegments>
 
-      {/* Subtle translucent fill */}
-      <mesh geometry={boxData.boxGeom}>
+      {/* Subtle translucent fill (raycast disabled so it never blocks mouse events) */}
+      <mesh geometry={boxData.boxGeom} raycast={() => null}>
         <meshBasicMaterial
           color={color}
           transparent

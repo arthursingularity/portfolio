@@ -36,7 +36,9 @@ function projectRayOntoAxis(ray, p0, axisDir) {
  */
 export default function BlenderModalTransform({
   selectedItem,
+  selectedItems = [],
   onUpdateTransform,
+  onUpdateTransforms,
   snapToGrid = true,
   gridSnapSize = 0.1,
   orbitControlsRef,
@@ -44,7 +46,6 @@ export default function BlenderModalTransform({
   onModalInfoChange,
 }) {
   const { camera, gl } = useThree();
-
   const [isMoving, setIsMoving] = useState(false);
   const [axisLock, setAxisLock] = useState(null); // 'x' | 'y' | 'z' | null
   const [initialPos, setInitialPos] = useState(null);
@@ -57,15 +58,18 @@ export default function BlenderModalTransform({
     initialPos: null,
     currentPos: null,
     selectedItem,
+    selectedItems,
+    initialPositionsMap: {},
     snapToGrid,
     gridSnapSize,
   });
 
   useEffect(() => {
     stateRef.current.selectedItem = selectedItem;
+    stateRef.current.selectedItems = selectedItems;
     stateRef.current.snapToGrid = snapToGrid;
     stateRef.current.gridSnapSize = gridSnapSize;
-  }, [selectedItem, snapToGrid, gridSnapSize]);
+  }, [selectedItem, selectedItems, snapToGrid, gridSnapSize]);
 
   // Notify parent of modal active state and UI info
   useEffect(() => {
@@ -93,7 +97,29 @@ export default function BlenderModalTransform({
     const s = stateRef.current;
     if (!s.isMoving) return;
 
-    if (s.selectedItem && s.currentPos) {
+    if (
+      s.selectedItems &&
+      s.selectedItems.length > 1 &&
+      onUpdateTransforms &&
+      s.initialPos &&
+      s.currentPos
+    ) {
+      const deltaX = s.currentPos[0] - s.initialPos[0];
+      const deltaY = s.currentPos[1] - s.initialPos[1];
+      const deltaZ = s.currentPos[2] - s.initialPos[2];
+      const updates = s.selectedItems.map((it) => {
+        const baseP = s.initialPositionsMap?.[it.id] || it.position;
+        return {
+          id: it.id,
+          position: [
+            Math.round((baseP[0] + deltaX) * 100) / 100,
+            Math.round((baseP[1] + deltaY) * 100) / 100,
+            Math.round((baseP[2] + deltaZ) * 100) / 100,
+          ],
+        };
+      });
+      onUpdateTransforms(updates);
+    } else if (s.selectedItem && s.currentPos) {
       onUpdateTransform?.(s.selectedItem.id, {
         position: [
           Math.round(s.currentPos[0] * 100) / 100,
@@ -112,6 +138,7 @@ export default function BlenderModalTransform({
     stateRef.current.axisLock = null;
     stateRef.current.initialPos = null;
     stateRef.current.currentPos = null;
+    stateRef.current.initialPositionsMap = {};
 
     setIsMoving(false);
     setAxisLock(null);
@@ -124,7 +151,18 @@ export default function BlenderModalTransform({
     const s = stateRef.current;
     if (!s.isMoving) return;
 
-    if (s.selectedItem && s.initialPos) {
+    if (
+      s.selectedItems &&
+      s.selectedItems.length > 1 &&
+      onUpdateTransforms &&
+      s.initialPositionsMap
+    ) {
+      const updates = s.selectedItems.map((it) => ({
+        id: it.id,
+        position: [...(s.initialPositionsMap[it.id] || it.position)],
+      }));
+      onUpdateTransforms(updates);
+    } else if (s.selectedItem && s.initialPos) {
       onUpdateTransform?.(s.selectedItem.id, {
         position: [...s.initialPos],
       });
@@ -139,6 +177,7 @@ export default function BlenderModalTransform({
     stateRef.current.axisLock = null;
     stateRef.current.initialPos = null;
     stateRef.current.currentPos = null;
+    stateRef.current.initialPositionsMap = {};
 
     setIsMoving(false);
     setAxisLock(null);
@@ -166,10 +205,15 @@ export default function BlenderModalTransform({
           e.stopPropagation();
 
           const startPos = [...s.selectedItem.position];
+          const initMap = {};
+          (s.selectedItems || []).forEach((it) => {
+            initMap[it.id] = [...it.position];
+          });
           stateRef.current.isMoving = true;
           stateRef.current.axisLock = null;
           stateRef.current.initialPos = startPos;
           stateRef.current.currentPos = startPos;
+          stateRef.current.initialPositionsMap = initMap;
 
           if (orbitControlsRef?.current) {
             orbitControlsRef.current.enabled = false;
@@ -245,10 +289,12 @@ export default function BlenderModalTransform({
       if (s.axisLock === "x") {
         const t = projectRayOntoAxis(ray, p0, new THREE.Vector3(1, 0, 0));
         newX = p0.x + snapVal(t, step);
-      } else if (s.axisLock === "y") {
+      } else if (s.axisLock === "z") {
+        // In Blender convention, Z is height (Y in Three.js)
         const t = projectRayOntoAxis(ray, p0, new THREE.Vector3(0, 1, 0));
         newY = p0.y + snapVal(t, step);
-      } else if (s.axisLock === "z") {
+      } else if (s.axisLock === "y") {
+        // In Blender convention, Y is depth (Z in Three.js)
         const t = projectRayOntoAxis(ray, p0, new THREE.Vector3(0, 0, 1));
         newZ = p0.z + snapVal(t, step);
       } else {
@@ -271,7 +317,25 @@ export default function BlenderModalTransform({
       setCurrentPos(nextPos);
 
       // Realtime visual position update
-      onUpdateTransform?.(s.selectedItem.id, { position: nextPos });
+      if (s.selectedItems && s.selectedItems.length > 1 && onUpdateTransforms) {
+        const deltaX = nextPos[0] - s.initialPos[0];
+        const deltaY = nextPos[1] - s.initialPos[1];
+        const deltaZ = nextPos[2] - s.initialPos[2];
+        const updates = s.selectedItems.map((it) => {
+          const baseP = s.initialPositionsMap?.[it.id] || it.position;
+          return {
+            id: it.id,
+            position: [
+              Math.round((baseP[0] + deltaX) * 100) / 100,
+              Math.round((baseP[1] + deltaY) * 100) / 100,
+              Math.round((baseP[2] + deltaZ) * 100) / 100,
+            ],
+          };
+        });
+        onUpdateTransforms(updates);
+      } else {
+        onUpdateTransform?.(s.selectedItem.id, { position: nextPos });
+      }
     };
 
     const handlePointerDown = (e) => {
@@ -313,14 +377,14 @@ export default function BlenderModalTransform({
         new THREE.Vector3(currentPos[0] - 250, currentPos[1], currentPos[2]),
         new THREE.Vector3(currentPos[0] + 250, currentPos[1], currentPos[2]),
       ];
-    } else if (axisLock === "y") {
-      color = "#52b536"; // Green for Y
+    } else if (axisLock === "z") {
+      color = "#3b82f6"; // Blue for Z (Height / Vertical in Blender)
       points = [
         new THREE.Vector3(currentPos[0], currentPos[1] - 250, currentPos[2]),
         new THREE.Vector3(currentPos[0], currentPos[1] + 250, currentPos[2]),
       ];
-    } else if (axisLock === "z") {
-      color = "#3b82f6"; // Blue for Z
+    } else if (axisLock === "y") {
+      color = "#52b536"; // Green for Y (Depth / Horizontal in Blender)
       points = [
         new THREE.Vector3(currentPos[0], currentPos[1], currentPos[2] - 250),
         new THREE.Vector3(currentPos[0], currentPos[1], currentPos[2] + 250),

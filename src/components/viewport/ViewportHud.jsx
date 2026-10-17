@@ -32,7 +32,7 @@ export default function ViewportHud({
       {/* Subtle Blender Bottom Status Bar */}
       <div className="absolute bottom-2 left-4 z-10 pointer-events-none font-mono select-none flex items-center gap-4 text-[12px]">
         <span className="hidden sm:inline text-white/50">
-          Rotacionar: Botão Esquerdo do Mouse | Selecionar: Botão Esq. | Pan: Botão Dir. | Zoom: Scroll | Mover(G) | Girar(R)
+          Botão Dir. / Shift+A: Adicionar | Mover(G) | Girar(R) | Ctrl+Z: Desfazer | Ctrl+C / Ctrl+V: Copiar/Colar
         </span>
       </div>
     </>

@@ -1,5 +1,9 @@
 @import "tailwindcss";
 
+nextjs-portal {
+  display: none !important;
+}
+
 :root {
   /* ── Blue / Dark Palette ── */
   --primary-50: #e6f4ff;

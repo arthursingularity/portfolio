@@ -39,8 +39,6 @@ export default function PalletModel({
             key={`top-slat-${i}`}
             position={[0, height / 2 - boardThickness / 2, z]}
             material={woodMaterial}
-            castShadow
-            receiveShadow
           >
             <boxGeometry args={[width, boardThickness, slatWidth]} />
           </mesh>
@@ -53,8 +51,6 @@ export default function PalletModel({
           <mesh
             position={[x, 0, 0]}
             material={woodMaterial}
-            castShadow
-            receiveShadow
           >
             <boxGeometry args={[0.09, blockHeight, depth]} />
           </mesh>
@@ -67,8 +63,6 @@ export default function PalletModel({
           key={`bottom-slat-${i}`}
           position={[0, -height / 2 + boardThickness / 2, z]}
           material={woodMaterial}
-          castShadow
-          receiveShadow
         >
           <boxGeometry args={[width, boardThickness, 0.12]} />
         </mesh>

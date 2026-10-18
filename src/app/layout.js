@@ -11,30 +11,27 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-{/*
 export const metadata = {
-  title: "Arthur Development Workspace",
+  title: "Editor | Workspace",
   description:
-    "Portfólio pessoal de Arthur Alves. Desenvolvedor Fullstack especializado em JavaScript.",
+    "Software de modelagem 3D.",
   keywords: [
-    "desenvolvedor",
-    "fullstack",
-    "react",
-    "next.js",
-    "portfólio",
-    "frontend",
-    "backend",
+    "3d",
+    "cad",
+    "software",
+    "gratis",
+    "online",
+    "gratuito"
   ],
   authors: [{ name: "Arthur Alves" }],
   openGraph: {
-    title: "Arthur Development Workspace",
+    title: "Editor",
     description:
-      "Portfólio pessoal de Arthur Alves. Desenvolvedor Fullstack especializado em aplicações web modernas.",
+      "Software de modelagem 3D.",
     type: "website",
   },
 };
 
-*/}
 
 export const viewport = {
   width: "device-width",

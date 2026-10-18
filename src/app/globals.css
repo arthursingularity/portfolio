@@ -4,6 +4,11 @@ nextjs-portal {
   display: none !important;
 }
 
+.buttonHover:hover {
+  filter: brightness(80%);
+  cursor: pointer;
+}
+
 :root {
   /* ── Blue / Dark Palette ── */
   --primary-50: #e6f4ff;

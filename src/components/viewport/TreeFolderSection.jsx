@@ -58,10 +58,23 @@ export default function TreeFolderSection({
     );
   }, [items, searchQuery]);
 
-  // Ícone padrão dos objetos (Blender Theme)
-  const getItemIcon = () => (
-    <Icon icon="at-icons:cube" className="text-[14px]" />
-  );
+  // Ícone contextual dos objetos (Blender Theme)
+  const getItemIcon = (type) => {
+    switch (type) {
+      case "wall":
+        return <Icon icon="lucide:brick-wall" className="text-[14px] text-neutral-400" />;
+      case "bar":
+        return <Icon icon="lucide:square" className="text-[14px] text-neutral-400" />;
+      case "floor":
+        return <Icon icon="akar-icons:square-fill" className="text-[14px] text-neutral-400" />;
+      case "pallet":
+        return <Icon icon="fa7-solid:pallet" className="text-[14px] text-neutral-400" />;
+      case "drawer_g":
+        return <Icon icon="lucide:inbox" className="text-[14px] text-neutral-400" />;
+      default:
+        return <Icon icon="at-icons:cube" className="text-[14px] text-neutral-400" />;
+    }
+  };
 
   return (
     <aside className="w-full flex-1 min-h-0 flex flex-col select-none overflow-hidden">
@@ -296,41 +309,6 @@ export default function TreeFolderSection({
               )}
             </div>
           )}
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0 mt-auto">
-          {saveMessage && (
-            <div
-              className={`text-[10px] w-full text-right px-3 truncate ${
-                saveStatus === "error"
-                  ? "text-red-400"
-                  : saveStatus === "success"
-                  ? "text-emerald-400"
-                  : "text-white/60"
-              }`}
-              title={saveMessage}
-            >
-              {saveMessage}
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={() => onSave && onSave(projectName)}
-            disabled={saveStatus === "saving"}
-            className={`ml-auto justify-end bg-blue-400 text-black text-[13px] px-4 py-1 rounded mb-2 mr-2 cursor-pointer hover:opacity-80 flex items-center gap-1.5 ${
-              saveStatus === "saving" ? "opacity-60 cursor-not-allowed" : ""
-            }`}
-          >
-            {saveStatus === "saving" ? (
-              <>
-                <span className="w-2.5 h-2.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                <span>Salvando...</span>
-              </>
-            ) : saveStatus === "success" ? (
-              <span>✓ Salvo!</span>
-            ) : (
-              <span>Salvar</span>
-            )}
-          </button>
         </div>
       </div>
     </aside>

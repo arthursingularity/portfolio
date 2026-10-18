@@ -2,6 +2,7 @@
 
 import React, { useMemo } from "react";
 import * as THREE from "three";
+import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 // ---------------------------------------------------------------------------
 // DIMENSÕES E ESCALA EXATAMENTE IGUAIS ÀS CAIXAS DE EstoqueModel.tsx
@@ -130,7 +131,7 @@ export default function BoxModel({
         maxEscurecimento = 0.026;
       } else if (upperHex.includes("E0E0E0")) {
         // Branco
-        maxEscurecimento = 0.035;
+        maxEscurecimento = 0.1;
       } else if (upperHex.includes("676767")) {
         // Cinza
         maxEscurecimento = 0.028;
@@ -226,91 +227,113 @@ export default function BoxModel({
   const rightPostX = crateW / 2 - postW / 2;
   const varalZ = -crateD / 2 - postD / 2;
 
+  // Geometria reutilizada para todas as caixas da coluna
+  const crateGeo = useMemo(
+    () => new THREE.BoxGeometry(crateW, crateH, crateD),
+    [crateW, crateH, crateD]
+  );
+
+  // Placa central de identificação do topo
+  const placaGeo = useMemo(
+    () => (hasVaral ? new THREE.BoxGeometry(tabW, tabH, postD + 0.006) : null),
+    [hasVaral, tabW, tabH, postD]
+  );
+
+  // Fusão de toda a estrutura metálica de suporte (Trilho + Pés + Varal) em 1 único draw call
+  const steelStructureGeo = useMemo(() => {
+    if (!hasRail && !hasVaral) return null;
+    const parts = [];
+
+    // Viga principal do trilho de chão
+    if (hasRail) {
+      const viga = new THREE.BoxGeometry(railW, railH, railD);
+      viga.translate(railCenterX, railH / 2, railCenterZ);
+      parts.push(viga);
+
+      // Pés externos de apoio
+      if (!isConnL) {
+        const footL = new THREE.BoxGeometry(0.06, 0.008, railD - 0.03);
+        footL.translate(-crateW * 0.35 + railCenterX, 0.004, railCenterZ);
+        parts.push(footL);
+      }
+      if (!isConnR) {
+        const footR = new THREE.BoxGeometry(0.06, 0.008, railD - 0.03);
+        footR.translate(crateW * 0.35 + railCenterX, 0.004, railCenterZ);
+        parts.push(footR);
+      }
+    }
+
+    // Estrutura do varal traseiro
+    if (hasVaral) {
+      if (!isConnL) {
+        const postL = new THREE.BoxGeometry(postW, postHeight, postD);
+        postL.translate(leftPostX, postCenterY, varalZ);
+        parts.push(postL);
+      }
+      if (!isConnR) {
+        const postR = new THREE.BoxGeometry(postW, postHeight, postD);
+        postR.translate(rightPostX, postCenterY, varalZ);
+        parts.push(postR);
+      }
+      const topBeam = new THREE.BoxGeometry(topBeamW, beamH, postD);
+      topBeam.translate(topBeamCenterX, topBeamCenterY, varalZ);
+      parts.push(topBeam);
+    }
+
+    if (parts.length === 0) return null;
+    const raw = mergeGeometries(
+      parts.map((g) => (g.index ? g.toNonIndexed() : g)),
+      false
+    );
+    raw.computeVertexNormals();
+    const result = mergeVertices(raw);
+    parts.forEach((g) => g.dispose());
+    raw.dispose();
+    return result;
+  }, [
+    hasRail,
+    hasVaral,
+    isConnL,
+    isConnR,
+    railW,
+    railH,
+    railD,
+    railCenterX,
+    railCenterZ,
+    crateW,
+    postW,
+    postHeight,
+    postD,
+    leftPostX,
+    rightPostX,
+    postCenterY,
+    varalZ,
+    topBeamW,
+    beamH,
+    topBeamCenterX,
+    topBeamCenterY,
+  ]);
+
   return (
     <group position={[0, 0, 0]}>
-      {/* ── 1. Trilho Sólido Laranja de Chão (apenas quando ativado) ── */}
-      {hasRail && (
-        <group position={[0, railH / 2, 0]}>
-          {/* Viga sólida laranja */}
-          <mesh
-            material={railMaterials.orangeRail}
-            position={[railCenterX, 0, railCenterZ]}
-            castShadow
-            receiveShadow
-          >
-            <boxGeometry args={[railW, railH, railD]} />
-          </mesh>
-
-          {/* Pés de apoio na base (apenas nas extremidades externas da estrutura) */}
-          {!isConnL && (
-            <mesh
-              material={railMaterials.orangeDark}
-              position={[-crateW * 0.35 + railCenterX, -railH / 2 + 0.004, railCenterZ]}
-            >
-              <boxGeometry args={[0.06, 0.008, railD - 0.03]} />
-            </mesh>
-          )}
-          {!isConnR && (
-            <mesh
-              material={railMaterials.orangeDark}
-              position={[crateW * 0.35 + railCenterX, -railH / 2 + 0.004, railCenterZ]}
-            >
-              <boxGeometry args={[0.06, 0.008, railD - 0.03]} />
-            </mesh>
-          )}
-        </group>
+      {/* ── 1. Toda a estrutura de aço fundida em 1 único draw call ── */}
+      {steelStructureGeo && (
+        <mesh
+          geometry={steelStructureGeo}
+          material={railMaterials.orangeRail}
+        />
       )}
 
-      {/* ── 2. Varal Atrás das Caixas (quando ativado) ── */}
-      {hasVaral && (
-        <group position={[0, 0, varalZ]}>
-          {/* Poste Vertical Esquerdo (somente na coluna da extrema esquerda) */}
-          {!isConnL && (
-            <mesh
-              material={railMaterials.orangeRail}
-              position={[leftPostX, postCenterY, 0]}
-              castShadow
-              receiveShadow
-            >
-              <boxGeometry args={[postW, postHeight, postD]} />
-            </mesh>
-          )}
-
-          {/* Poste Vertical Direito (somente na coluna da extrema direita) */}
-          {!isConnR && (
-            <mesh
-              material={railMaterials.orangeRail}
-              position={[rightPostX, postCenterY, 0]}
-              castShadow
-              receiveShadow
-            >
-              <boxGeometry args={[postW, postHeight, postD]} />
-            </mesh>
-          )}
-
-          {/* Barra Superior Horizontal (conecta perfeitamente com colunas vizinhas) */}
-          <mesh
-            material={railMaterials.orangeRail}
-            position={[topBeamCenterX, topBeamCenterY, 0]}
-            castShadow
-            receiveShadow
-          >
-            <boxGeometry args={[topBeamW, beamH, postD]} />
-          </mesh>
-
-          {/* Placa Central no Topo (por cima do varal, 1 para cada coluna) */}
-          <mesh
-            material={railMaterials.blackPlaca}
-            position={[0, tabCenterY, 0]}
-            castShadow
-            receiveShadow
-          >
-            <boxGeometry args={[tabW, tabH, postD + 0.006]} />
-          </mesh>
-        </group>
+      {/* ── 2. Placa Central no Topo (1 único mesh) ── */}
+      {hasVaral && placaGeo && (
+        <mesh
+          geometry={placaGeo}
+          material={railMaterials.blackPlaca}
+          position={[0, tabCenterY, varalZ]}
+        />
       )}
 
-      {/* ── 3. Coluna Única de Caixas (0 a 6 de altura com cores configuradas) ── */}
+      {/* ── 3. Coluna de Caixas compartilhando a mesma geometria (Zero GC / Instância limpa) ── */}
       {safeCount > 0 && (
         <group position={[0, baseY, 0]}>
           {Array.from({ length: safeCount }).map((_, tierIdx) => {
@@ -320,13 +343,10 @@ export default function BoxModel({
             return (
               <mesh
                 key={tierIdx}
+                geometry={crateGeo}
                 material={crateMat}
                 position={[0, crateY, 0]}
-                castShadow
-                receiveShadow
-              >
-                <boxGeometry args={[crateW, crateH, crateD]} />
-              </mesh>
+              />
             );
           })}
         </group>

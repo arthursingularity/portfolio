@@ -166,6 +166,7 @@ function BlenderUnifiedGrid({
       position={[0, -0.0005, 0]}
       renderOrder={0}
       material={material}
+      raycast={() => null}
     >
       <planeGeometry args={[gridSize, gridSize]} />
     </mesh>

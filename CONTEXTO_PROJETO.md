@@ -10,6 +10,7 @@
 O **Sector Studio** é um estúdio web 3D de alta precisão para planejamento, modelagem e exportação de layouts industriais, logísticos e de armazenagem (armazéns, setores de estoque, linhas de montagem e logística interna).
 
 ### Filosofia de Design e UX
+
 - **Inspirado no Blender + Vercel Design System**:
   - Extremamente limpo, técnico, minimalista, silencioso visualmente e de alta densidade de informação.
   - Paleta escura neutra: `#000000`, `#0a0a0a`, `#111115`, `#141416`, `#18181b`, `#1e1e21`.
@@ -18,6 +19,7 @@ O **Sector Studio** é um estúdio web 3D de alta precisão para planejamento, m
   - Zero efeitos chamativos (sem neons cyberpunk, sem glassmorphism exagerado, sem animações lentas).
 
 ### Stack Tecnológica
+
 - **Framework:** Next.js (App Router, Client Components)
 - **3D Engine:** Three.js + React Three Fiber (`@react-three/fiber`) + Drei (`@react-three/drei`)
 - **Estilização:** Tailwind CSS + Vanilla CSS tokens
@@ -43,7 +45,7 @@ O layout principal divide a tela em uma estrutura vertical com a barra estilo Bl
 |       - Câmera isométrica com OrbitControls           |    - Renomeação inline |
 |       - Gizmo de Orientação no topo direito           +------------------------+
 |       - Status Bar Blender no canto inferior esquerdo | 2. Propriedades        |
-|       - TransformPopup Fixo no canto inferior direito |    (ItemInspector)     |
+|       - TransformPopup Fixo no canto inferior direito |    (ModelProperties)     |
 |         (Posição X/Y/Z + Rotação 90°/Graus)           |    - Config. Objeto    |
 |                                                       |    - Trilho / Varal    |
 |                                                       |    - Multiplicar Col.  |
@@ -80,7 +82,7 @@ O layout principal divide a tela em uma estrutura vertical com a barra estilo Bl
    - Botão de visibilidade (ícone de olho) para ocultar/exibir cada modelo no 3D.
    - Barra de busca / filtro em tempo real.
 
-4. **`ItemInspector.jsx` (Painel de Propriedades)**
+4. **`ModelProperties.jsx` (Painel de Propriedades)**
    - Focado **exclusivamente nas propriedades paramétricas** de cada modelo (Trilho, Varal, Multiplicação, Cores, Quantidade de Caixas, Dimensões de Piso, Níveis de Rack).
    - **IMPORTANTE:** Não contém nenhum controle de posição ou rotação (transferidos para o `TransformPopup`).
    - Renomeação sincronizada com o Outliner no cabeçalho.
@@ -113,6 +115,7 @@ O layout principal divide a tela em uma estrutura vertical com a barra estilo Bl
 O `BoxModel` é o componente mais customizável do sistema, representando uma coluna de caixas industriais com base de trilho de aço e estrutura de varal superior.
 
 ### Dimensões Exatas e Fator de Escala
+
 - **Fator de Escala:** `FATOR_ESCALA = 1.95` (compatibilidade matemática exata com `EstoqueModel`).
 - **Largura da Caixa ($X$):** `CAIXA_LARGURA = 0.298096 * 1.95 = 0.5812872 m`
 - **Profundidade da Caixa ($Z$):** `CAIXA_COMPRIMENTO = 0.466947 * 1.95 = 0.91054665 m`
@@ -121,12 +124,14 @@ O `BoxModel` é o componente mais customizável do sistema, representando uma co
 - **Gap Lateral entre Colunas Multiplicadas:** `GAP_LATERAL = GAP_Y = 0.003 m` (exatamente igual ao vertical).
 
 ### Trilho Laranja (`rail` / `trilho`)
+
 - Altura do trilho: `railH = 0.070 m`.
 - Cor: Laranja de aço `#FF6600`.
 - **Regra de Largura:** O trilho possui **exatamente a mesma largura lateral das caixas** (`crateW = 0.5812872 m`). Não transborda para fora.
 - Pés de apoio escuros nas extremidades externas. Quando conectado lateralmente a outra coluna (`isConnL` ou `isConnR`), omite o pé interno para continuidade limpa.
 
 ### Estrutura do Varal (`varal`)
+
 - Habilitado opcionalmente atrás das caixas (só pode ser ativado se o Trilho estiver ativo).
 - Postes verticais: `postW = 0.04 m`, `postD = 0.02 m`, cor `#FF6600`.
 - Barra horizontal superior: `beamH = 0.045 m`, cor `#FF6600`.
@@ -134,6 +139,7 @@ O `BoxModel` é o componente mais customizável do sistema, representando uma co
 - **Regra de Continuidade:** Quando conectado com vizinhos (`connectedLeft` ou `connectedRight`), a barra superior e o trilho estendem metade do gap lateral (`GAP_LATERAL / 2`) para conectar perfeitamente sem costura.
 
 ### Quantidade de Caixas: `0 a 6`
+
 - O usuário pode selecionar de **0 até 6 caixas**.
 - **Caso 0 caixas:**
   - O grupo de caixas brancas não é renderizado.
@@ -141,7 +147,9 @@ O `BoxModel` é o componente mais customizável do sistema, representando uma co
   - Se o usuário selecionar 0 e o trilho estiver desativado, o trilho é ativado automaticamente para evitar objeto invisível.
 
 ### Paleta Base de Cores e Regra de Fidelidade
+
 A paleta oficial é composta por 6 cores funcionais fixas:
+
 ```javascript
 Verde:    #009F5A
 Vermelho: #B65241
@@ -152,6 +160,7 @@ Branco:   #E0E0E0
 ```
 
 #### Regra Absoluta de Variação de Cores:
+
 - **Matiz (Hue) e Saturação (Saturation) NUNCA são alterados.** (O verde é sempre o mesmo verde puro, o amarelo nunca vira mostarda, o azul nunca vira azul-marinho pesado, etc.).
 - A aleatoriedade atua **exclusivamente na Luminosidade ($L$)**, calibrada suavemente por cor:
   - `Verde (#009F5A)`: variação máxima de até `~2.0%` (evita caixas excessivamente escuras/musgo, pois o verde já possui baixa luminosidade natural ~31%).
@@ -171,6 +180,7 @@ Branco:   #E0E0E0
 ## 4. Multiplicação de Colunas (`multiplyColumns`)
 
 Implementada em `sectorState.js`:
+
 - O usuário define a quantidade multiplicadora (ex: 2x a 200x).
 - **Passo da Coluna:** `PASSO_COLUNA = CAIXA_LARGURA + GAP_X = 0.5812872 + 0.003 = 0.5842872 m`.
 - O vetor de deslocamento respeita a rotação Euler do modelo original (`dir.applyEuler(rot)`).
@@ -184,6 +194,7 @@ Implementada em `sectorState.js`:
 ## 5. Gerenciamento de Estado (`sectorState.js`)
 
 Centraliza todo o estado da aplicação via hook `useSectorState()`:
+
 - `items`: Lista de todos os objetos no setor.
 - `selectedId`: ID do item principal selecionado.
 - `selectedIds`: Array de IDs de todos os itens selecionados (suporte a seleção múltipla).
@@ -215,25 +226,25 @@ Centraliza todo o estado da aplicação via hook `useSectorState()`:
 
 ## 7. Atalhos de Teclado Suportados
 
-| Atalho | Ação |
-|---|---|
-| `G` | Iniciar movimentação do(s) objeto(s) selecionado(s) pelo cursor do mouse |
-| `R` | Iniciar rotação do(s) objeto(s) selecionado(s) pelo cursor do mouse |
-| `X` / `Y` / `Z` | Travar movimento/rotação no respectivo eixo |
-| `Shift + Clique` | Selecionar múltiplos objetos (Blender multi-selection) |
-| `Ctrl + Clique` | Alternar seleção de múltiplos objetos |
-| `Shift + A` / `Botão Direito` | Abrir menu de contexto de adição de modelos |
-| `Shift + D` | Duplicar objeto(s) selecionado(s) |
-| `Delete` / `Backspace` | Excluir objeto(s) selecionado(s) |
-| `Ctrl + Z` | Desfazer (Undo) |
-| `Ctrl + Y` / `Ctrl + Shift + Z` | Refazer (Redo) |
-| `Ctrl + C` / `Ctrl + V` | Copiar e Colar objetos |
+| Atalho                          | Ação                                                                     |
+| ------------------------------- | ------------------------------------------------------------------------ |
+| `G`                             | Iniciar movimentação do(s) objeto(s) selecionado(s) pelo cursor do mouse |
+| `R`                             | Iniciar rotação do(s) objeto(s) selecionado(s) pelo cursor do mouse      |
+| `X` / `Y` / `Z`                 | Travar movimento/rotação no respectivo eixo                              |
+| `Shift + Clique`                | Selecionar múltiplos objetos (Blender multi-selection)                   |
+| `Ctrl + Clique`                 | Alternar seleção de múltiplos objetos                                    |
+| `Shift + A` / `Botão Direito`   | Abrir menu de contexto de adição de modelos                              |
+| `Shift + D`                     | Duplicar objeto(s) selecionado(s)                                        |
+| `Delete` / `Backspace`          | Excluir objeto(s) selecionado(s)                                         |
+| `Ctrl + Z`                      | Desfazer (Undo)                                                          |
+| `Ctrl + Y` / `Ctrl + Shift + Z` | Refazer (Redo)                                                           |
+| `Ctrl + C` / `Ctrl + V`         | Copiar e Colar objetos                                                   |
 
 ---
 
 ## 8. Convenções para Futuras Alterações
 
-1. **Nunca misturar transformações no `ItemInspector`**: Toda manipulação de coordenadas e rotações pertence ao `TransformPopup.jsx`.
+1. **Nunca misturar transformações no `ModelProperties`**: Toda manipulação de coordenadas e rotações pertence ao `TransformPopup.jsx`.
 2. **Manter proporções de `BoxModel`**: Qualquer alteração em dimensões de caixa, trilho ou varal deve manter `FATOR_ESCALA = 1.95` e `GAP_LATERAL = GAP_Y = 0.003`.
 3. **Fidelidade de Cores**: Variações em caixas devem usar semente determinística e alterar somente luminosidade ($L$), nunca matiz ($H$) ou saturação ($S$).
 4. **Multiplicação Segura**: Sempre respeitar o estado do item de origem ao multiplicar ou duplicar.

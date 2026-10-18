@@ -6,9 +6,10 @@
 Para a documentação técnica completa de arquitetura, convenções, dimensões industriais e histórico de desenvolvimento, consulte [CONTEXTO_PROJETO.md](file:///c:/Users/arthu/OneDrive/Desktop/Projetos/Portfolio/portfolio/CONTEXTO_PROJETO.md).
 
 ## Regras Críticas do Projeto:
+
 1. **Posicionamento e Rotação**:
    - Todo controle de posição ($X, Y, Z$) e rotação reside exclusivamente em [TransformPopup.jsx](file:///c:/Users/arthu/OneDrive/Desktop/Projetos/Portfolio/portfolio/src/components/viewport/TransformPopup.jsx) (canto inferior direito do Cenário 3D).
-   - [ItemInspector.jsx](file:///c:/Users/arthu/OneDrive/Desktop/Projetos/Portfolio/portfolio/src/components/viewport/ItemInspector.jsx) cuida apenas de propriedades específicas dos modelos (Trilho, Varal, Multiplicação, Cores, Quantidade de Caixas).
+   - [ModelProperties.jsx](file:///c:/Users/arthu/OneDrive/Desktop/Projetos/Portfolio/portfolio/src/components/viewport/ModelProperties.jsx) cuida apenas de propriedades específicas dos modelos (Trilho, Varal, Multiplicação, Cores, Quantidade de Caixas).
 
 2. **BoxModel.jsx (Caixas e Trilho)**:
    - Dimensões calibradas com `FATOR_ESCALA = 1.95`.

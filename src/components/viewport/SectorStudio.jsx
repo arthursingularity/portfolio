@@ -3,13 +3,15 @@
 import React, { useState, useRef, useEffect } from "react";
 import SceneCanvas from "./SceneCanvas";
 import ViewportHud from "./ViewportHud";
-import ItemPalette from "./ItemPalette";
-import ItemInspector from "./ItemInspector";
+import ModelProperties from "./ModelProperties";
 import TreeFolderSection from "./TreeFolderSection";
 import TransformPopup from "./TransformPopup";
+import FloorMarkingPopup from "../configPopups/FloorMarkingPopup";
+import FpsCounter from "./FpsCounter";
 import TopBar from "./TopBar";
 import { useSectorState } from "./sectorState";
 import { saveSectorGlb } from "./exportGlb";
+import LeftBar from "./LeftBar";
 
 export default function SectorStudio() {
   const [cellSize, setCellSize] = useState(1);
@@ -22,7 +24,10 @@ export default function SectorStudio() {
   const [projectName, setProjectName] = useState(() => {
     if (typeof window !== "undefined") {
       try {
-        return localStorage.getItem("sector_studio_project_name") || "setor_principal";
+        return (
+          localStorage.getItem("sector_studio_project_name") ||
+          "setor_principal"
+        );
       } catch (e) {
         return "setor_principal";
       }
@@ -45,6 +50,7 @@ export default function SectorStudio() {
     selectedId,
     selectedIds,
     setSelectedId,
+    setSelectedIds,
     selectedItem,
     selectedItems,
     transformMode,
@@ -72,7 +78,11 @@ export default function SectorStudio() {
       setSaveStatus("saving");
       setSaveMessage("Gerando GLB...");
 
-      const nameToUse = (customFilename || projectName || "setor_principal").trim();
+      const nameToUse = (
+        customFilename ||
+        projectName ||
+        "setor_principal"
+      ).trim();
       const filename = nameToUse.toLowerCase().endsWith(".glb")
         ? nameToUse
         : `${nameToUse}.glb`;
@@ -104,6 +114,7 @@ export default function SectorStudio() {
     x: 0,
     y: 0,
   });
+  const [axisLock, setAxisLock] = useState(null); // 'x' | 'y' | 'z' | null
   const viewportRef = useRef(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
 
@@ -132,7 +143,7 @@ export default function SectorStudio() {
       }
       // Ctrl + C (Copia o modelo selecionado)
       else if ((e.ctrlKey || e.metaKey) && (e.key === "c" || e.key === "C")) {
-        if (selectedId) {
+        if (selectedIds.length > 0 || selectedId) {
           e.preventDefault();
           copyItem(selectedId);
         }
@@ -150,12 +161,120 @@ export default function SectorStudio() {
           x: lastMousePos.current.x || window.innerWidth / 3,
           y: lastMousePos.current.y || window.innerHeight / 3,
         });
-      } else if (e.key === "g" || e.key === "G" || e.key === "t" || e.key === "T") {
+      } else if (
+        e.key === "w" ||
+        e.key === "W" ||
+        e.key === "b" ||
+        e.key === "B"
+      ) {
+        setTransformMode("select");
+        setAxisLock(null);
+      } else if (
+        e.key === "g" ||
+        e.key === "G" ||
+        e.key === "t" ||
+        e.key === "T"
+      ) {
         setTransformMode("translate");
+        setAxisLock(null);
       } else if (e.key === "r" || e.key === "R") {
         setTransformMode("rotate");
+        setAxisLock(null);
+      } else if (
+        (e.key === "x" || e.key === "X") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      ) {
+        if (transformMode === "translate" && (selectedIds.length > 0 || selectedId)) {
+          e.preventDefault();
+          setAxisLock((cur) => (cur === "x" ? null : "x"));
+        }
+      } else if (
+        (e.key === "y" || e.key === "Y") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      ) {
+        if (transformMode === "translate" && (selectedIds.length > 0 || selectedId)) {
+          e.preventDefault();
+          setAxisLock((cur) => (cur === "y" ? null : "y"));
+        }
+      } else if (
+        (e.key === "z" || e.key === "Z") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      ) {
+        if (transformMode === "translate" && (selectedIds.length > 0 || selectedId)) {
+          e.preventDefault();
+          setAxisLock((cur) => (cur === "z" ? null : "z"));
+        }
+      } else if (
+        (e.key === "ArrowUp" ||
+          e.key === "ArrowDown" ||
+          e.key === "ArrowLeft" ||
+          e.key === "ArrowRight") &&
+        transformMode === "translate" &&
+        (selectedIds.length > 0 || selectedId)
+      ) {
+        e.preventDefault();
+        const step = 0.05;
+        let deltaX = 0;
+        let deltaY = 0; // vertical height in Three.js (Blender Z)
+        let deltaZ = 0; // depth in Three.js (Blender Y)
+
+        if (axisLock === "x") {
+          deltaX = e.key === "ArrowRight" || e.key === "ArrowUp" ? step : -step;
+        } else if (axisLock === "y") {
+          // Y axis in Blender = depth (Three.js Z)
+          deltaZ = e.key === "ArrowUp" || e.key === "ArrowRight" ? step : -step;
+        } else if (axisLock === "z") {
+          // Z axis in Blender = vertical height (Three.js Y)
+          deltaY = e.key === "ArrowUp" || e.key === "ArrowRight" ? step : -step;
+        } else {
+          if (e.key === "ArrowLeft") deltaX = -step;
+          if (e.key === "ArrowRight") deltaX = step;
+          if (e.key === "ArrowUp") deltaZ = -step;
+          if (e.key === "ArrowDown") deltaZ = step;
+        }
+
+        const activeTargets =
+          selectedItems.length > 0
+            ? selectedItems
+            : selectedItem
+            ? [selectedItem]
+            : [];
+        if (activeTargets.length > 1) {
+          const updates = activeTargets.map((it) => ({
+            id: it.id,
+            position: [
+              Math.round(((it.position?.[0] || 0) + deltaX) * 1000) / 1000,
+              Math.round(((it.position?.[1] || 0) + deltaY) * 1000) / 1000,
+              Math.round(((it.position?.[2] || 0) + deltaZ) * 1000) / 1000,
+            ],
+          }));
+          updateTransforms(updates);
+        } else if (activeTargets.length === 1) {
+          const it = activeTargets[0];
+          updateTransform(it.id, {
+            position: [
+              Math.round(((it.position?.[0] || 0) + deltaX) * 1000) / 1000,
+              Math.round(((it.position?.[1] || 0) + deltaY) * 1000) / 1000,
+              Math.round(((it.position?.[2] || 0) + deltaZ) * 1000) / 1000,
+            ],
+          });
+        }
+      } else if (
+        (e.ctrlKey || e.metaKey) &&
+        (e.key === "a" || e.key === "A")
+      ) {
+        e.preventDefault();
+        setSelectedIds(
+          items.filter((it) => it.type !== "floor" && !it.hidden).map((it) => it.id)
+        );
       } else if (e.key === "Delete" || e.key === "Backspace") {
-        if (selectedId) {
+        if (selectedIds.length > 0 || selectedId) {
           removeItem(selectedId);
         }
       } else if (
@@ -163,12 +282,18 @@ export default function SectorStudio() {
         (e.key === "d" || e.key === "D")
       ) {
         e.preventDefault();
-        if (selectedId) {
+        if (selectedIds.length > 0 || selectedId) {
           duplicateItem(selectedId);
         }
       } else if (e.key === "Escape") {
-        setSelectedId(null);
-        setContextMenu((prev) => ({ ...prev, isOpen: false }));
+        if (axisLock !== null) {
+          e.preventDefault();
+          setAxisLock(null);
+        } else {
+          setSelectedId(null);
+          setSelectedIds([]);
+          setContextMenu((prev) => ({ ...prev, isOpen: false }));
+        }
       }
     };
 
@@ -176,56 +301,36 @@ export default function SectorStudio() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [
     selectedId,
+    selectedIds,
+    selectedItem,
+    selectedItems,
+    items,
+    transformMode,
+    axisLock,
     removeItem,
     duplicateItem,
     setTransformMode,
     setSelectedId,
+    setSelectedIds,
     undo,
     redo,
     copyItem,
     pasteItem,
+    updateTransform,
+    updateTransforms,
   ]);
 
-  // Viewport right-click & mouse tracking for Blender context menu
+  // Prevent browser context menu on 3D canvas so right-click is dedicated to viewport panning
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
 
-    let startX = 0;
-    let startY = 0;
-
-    const handlePointerDown = (e) => {
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-      if (e.button === 2) {
-        startX = e.clientX;
-        startY = e.clientY;
-      }
-    };
-
-    const handlePointerMove = (e) => {
-      lastMousePos.current = { x: e.clientX, y: e.clientY };
-    };
-
     const handleContextMenu = (e) => {
       e.preventDefault();
-      const dist = Math.hypot(e.clientX - startX, e.clientY - startY);
-      // Open context menu if user clicked in place (< 6px movement)
-      if (dist < 6) {
-        setContextMenu({
-          isOpen: true,
-          x: e.clientX,
-          y: e.clientY,
-        });
-      }
     };
 
-    el.addEventListener("pointerdown", handlePointerDown);
-    el.addEventListener("pointermove", handlePointerMove);
     el.addEventListener("contextmenu", handleContextMenu);
-
     return () => {
-      el.removeEventListener("pointerdown", handlePointerDown);
-      el.removeEventListener("pointermove", handlePointerMove);
       el.removeEventListener("contextmenu", handleContextMenu);
     };
   }, []);
@@ -263,7 +368,7 @@ export default function SectorStudio() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#111115] flex flex-col select-none font-sans">
+    <div className="relative w-screen h-screen overflow-hidden bg-[#111115] flex flex-col font-sans">
       {/* ── Barra Superior Estilo Blender (Fica acima das 3 Seções) ── */}
       <TopBar
         projectName={projectName}
@@ -273,17 +378,30 @@ export default function SectorStudio() {
         onUndo={undo}
         onRedo={redo}
         onAddItem={addItem}
+        onCopy={() => {
+          if (selectedIds.length > 0 || selectedId) copyItem(selectedId);
+        }}
+        onPaste={pasteItem}
         onDuplicate={() => {
-          if (selectedId) duplicateItem(selectedId);
+          if (selectedIds.length > 0 || selectedId) duplicateItem(selectedId);
         }}
         onDelete={() => {
-          if (selectedId) removeItem(selectedId);
+          if (selectedIds.length > 0 || selectedId) removeItem(selectedId);
         }}
         onExportGlb={() => handleSaveScene()}
         onResetCamera={handleResetCamera}
         onSetCameraView={setCameraView}
         gridVisible={gridVisible}
         setGridVisible={setGridVisible}
+        transformMode={transformMode}
+        setTransformMode={setTransformMode}
+        selectedCount={selectedIds.length}
+        onSelectAll={() =>
+          setSelectedIds(
+            items.filter((it) => it.type !== "floor" && !it.hidden).map((it) => it.id)
+          )
+        }
+        onDeselectAll={() => setSelectedId(null)}
       />
 
       {/* ── As 3 Seções do Studio (Cenário 3D, Outliner e Inspector) ── */}
@@ -293,6 +411,24 @@ export default function SectorStudio() {
           ref={viewportRef}
           className="row-span-2 col-start-1 relative w-full h-full min-w-0 min-h-0 rounded-lg overflow-hidden border border-white/[0.08] bg-[#18181b]"
         >
+          {/* Barra Lateral */}
+          <LeftBar
+            transformMode={transformMode}
+            setTransformMode={setTransformMode}
+            onResetCamera={handleResetCamera}
+            onAddItem={addItem}
+            isAddMenuOpen={contextMenu.isOpen}
+            setIsAddMenuOpen={(open) =>
+              setContextMenu((prev) => ({
+                ...prev,
+                isOpen: typeof open === "function" ? open(prev.isOpen) : open,
+              }))
+            }
+          />
+
+          {/* Indicador de FPS no Canto Superior Direito */}
+          <FpsCounter />
+
           {/* HUD e Legenda na base do 3D */}
           <ViewportHud
             cellSize={cellSize}
@@ -301,18 +437,6 @@ export default function SectorStudio() {
             setGridVisible={setGridVisible}
             onResetCamera={handleResetCamera}
             onSetCameraView={setCameraView}
-          />
-
-          {/* Menu de Contexto Blender (Clique Direito no 3D ou Shift+A) */}
-          <ItemPalette
-            isOpen={contextMenu.isOpen}
-            position={contextMenu}
-            onClose={() => setContextMenu((prev) => ({ ...prev, isOpen: false }))}
-            onAddItem={(type) => {
-              addItem(type);
-              setContextMenu((prev) => ({ ...prev, isOpen: false }));
-            }}
-            itemCount={items.length}
           />
 
           {/* Canvas 3D centrado perfeitamente no lado esquerdo */}
@@ -325,22 +449,44 @@ export default function SectorStudio() {
             selectedIds={selectedIds}
             selectedItems={selectedItems}
             onSelect={setSelectedId}
+            setSelectedIds={setSelectedIds}
             onUpdateTransform={updateTransform}
             onUpdateTransforms={updateTransforms}
+            onUpdateProps={updateProps}
             transformMode={transformMode}
+            axisLock={axisLock}
             snapToGrid={snapToGrid}
             controlsRef={controlsRef}
             exportGroupRef={exportGroupRef}
           />
 
-          {/* ── Popup Fixo de Posição e Rotação (Canto Inferior Direito do Cenário 3D) ── */}
+          {/* ── Popups Fixos (Canto Inferior Direito do Cenário 3D) ── */}
           {(selectedId || (selectedIds && selectedIds.length > 0)) && (
-            <TransformPopup
-              selectedItem={selectedItem}
-              selectedItems={selectedItems}
-              onUpdateTransform={updateTransform}
-              onUpdateTransforms={updateTransforms}
-            />
+            <div className="absolute bottom-1 right-1 z-30 flex flex-col space-y-1.5 items-end pointer-events-none">
+              {(() => {
+                const floor =
+                  selectedItem?.type === "floor"
+                    ? selectedItem
+                    : selectedItems?.find((it) => it.type === "floor");
+                if (!floor || !floor.props?.markingMode) return null;
+                return (
+                  <div className="pointer-events-auto">
+                    <FloorMarkingPopup
+                      item={floor}
+                      onUpdateProps={updateProps}
+                    />
+                  </div>
+                );
+              })()}
+              <div className="pointer-events-auto">
+                <TransformPopup
+                  selectedItem={selectedItem}
+                  selectedItems={selectedItems}
+                  onUpdateTransform={updateTransform}
+                  onUpdateTransforms={updateTransforms}
+                />
+              </div>
+            </div>
           )}
         </div>
 
@@ -365,9 +511,9 @@ export default function SectorStudio() {
           />
         </div>
 
-        {/* ── Seção Direita Inferior: ItemInspector ── */}
+        {/* ── Seção Direita Inferior: ModelProperties ── */}
         <div className="col-start-2 row-start-2 relative w-full h-full min-h-0 min-w-0 rounded-lg overflow-hidden border border-white/[0.08] bg-[#1e1e21] flex flex-col">
-          <ItemInspector
+          <ModelProperties
             item={selectedItem}
             onUpdateTransform={updateTransform}
             onUpdateProps={updateProps}

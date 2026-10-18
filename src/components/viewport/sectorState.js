@@ -12,7 +12,7 @@ export const WAREHOUSE_TEMPLATE = [
     name: "Piso",
     position: [0, 0, 0],
     rotation: [0, 0, 0],
-    props: { width: 16, depth: 14, thickness: 0.08, showDemarcation: true },
+    props: { width: 16, depth: 14, thickness: 0.08, showDemarcation: true, color: "#b0b4b8", paintedCells: {} },
   },
 ];
 
@@ -24,7 +24,12 @@ export function useSectorState() {
         if (saved) {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
-            return parsed;
+            // Garante que ao recarregar a página, o modo marcação sempre seja desativado
+            return parsed.map((item) =>
+              item?.props?.markingMode
+                ? { ...item, props: { ...item.props, markingMode: false } }
+                : item
+            );
           }
         }
       } catch (err) {
@@ -90,11 +95,16 @@ export function useSectorState() {
     }
   }, []);
 
-  // Auto-save to localStorage whenever items change
+  // Auto-save to localStorage whenever items change (garante markingMode sempre false no storage)
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        const sanitizedItems = items.map((item) =>
+          item?.props?.markingMode
+            ? { ...item, props: { ...item.props, markingMode: false } }
+            : item
+        );
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitizedItems));
       } catch (err) {
         console.warn("Erro ao persistir cenário no localStorage:", err);
       }
@@ -139,7 +149,7 @@ export function useSectorState() {
         case "floor":
           newItem.name = "Piso";
           newItem.position = [0, 0, 0];
-          newItem.props = { width: 10, depth: 10, thickness: 0.1, showDemarcation: true };
+          newItem.props = { width: 10, depth: 10, thickness: 0.1, showDemarcation: true, color: "#b0b4b8", paintedCells: {} };
           break;
         case "forklift":
           newItem.name = "Empilhadeira";
@@ -166,6 +176,63 @@ export function useSectorState() {
             boxColors: ["#E0E0E0", "#E0E0E0", "#E0E0E0", "#E0E0E0", "#E0E0E0", "#E0E0E0"],
           };
           break;
+        case "wall":
+          newItem.name = `Parede ${items.filter((it) => it.type === "wall").length + 1}`;
+          newItem.position = [0, 0, 0];
+          newItem.props = {
+            width: 0.2,
+            height: 2.8,
+            depth: 4.0,
+            color: "#d1d5db",
+          };
+          break;
+        case "bar":
+          newItem.name = `Barra ${items.filter((it) => it.type === "bar").length + 1}`;
+          newItem.position = [0, 0, 0];
+          newItem.props = {
+            width: 0.05,
+            height: 0.05,
+            depth: 2.0,
+            color: "#383d42",
+          };
+          break;
+        case "drawer_g": {
+          pushHistory(items);
+          const timestamp = Date.now();
+          const groupId = `drawer_group_${timestamp}`;
+          const newGroupItems = [];
+          const newGroupIds = [];
+
+          for (let i = 0; i < 5; i++) {
+            const itemId = `drawer_g-${timestamp}-${i + 1}`;
+            newGroupIds.push(itemId);
+            newGroupItems.push({
+              id: itemId,
+              type: "drawer_g",
+              groupId: groupId,
+              name: `Gaveta G ${i + 1}`,
+              position: [0, 0, 0],
+              rotation: [0, 0, 0],
+              props: {
+                tierIndex: i,
+                groupId: groupId,
+                color: "#26272B",
+                cageColor: "#ff6600",
+                plateColor: "#DBDBDB",
+                tamanho: 18,
+                escalaAltura: 1.0,
+                topGap: 0.035,
+                hasFeet: true,
+                legHeight: 0.07,
+              },
+            });
+          }
+
+          setItems((prev) => [...prev, ...newGroupItems]);
+          setSelectedIds([newGroupIds[0]]);
+          setTransformMode("translate");
+          return;
+        }
         default:
           break;
       }
@@ -177,18 +244,74 @@ export function useSectorState() {
     [items, pushHistory]
   );
 
-  // Update single item transforms
+  // Update single item transforms (syncs entire group when item has groupId)
   const updateTransform = useCallback(
     (id, { position, rotation }) => {
       pushHistory(items);
+      const targetItem = items.find((it) => it.id === id);
+      const groupId = targetItem?.groupId || targetItem?.props?.groupId;
+
+      if (groupId && targetItem) {
+        const deltaPos = position
+          ? [
+              position[0] - targetItem.position[0],
+              position[1] - targetItem.position[1],
+              position[2] - targetItem.position[2],
+            ]
+          : [0, 0, 0];
+        const deltaRotY = rotation ? rotation[1] - targetItem.rotation[1] : 0;
+
+        setItems((prev) =>
+          prev.map((item) => {
+            if ((item.groupId || item.props?.groupId) === groupId) {
+              if (item.id === id) {
+                return {
+                  ...item,
+                  position: position || item.position,
+                  rotation: rotation || item.rotation,
+                };
+              }
+
+              let newPos = [
+                Math.round((item.position[0] + deltaPos[0]) * 10000) / 10000,
+                Math.round((item.position[1] + deltaPos[1]) * 10000) / 10000,
+                Math.round((item.position[2] + deltaPos[2]) * 10000) / 10000,
+              ];
+              if (Math.abs(deltaRotY) > 1e-6) {
+                const ox = item.position[0] - targetItem.position[0];
+                const oz = item.position[2] - targetItem.position[2];
+                const cos = Math.cos(deltaRotY);
+                const sin = Math.sin(deltaRotY);
+                const rx = ox * cos - oz * sin;
+                const rz = ox * sin + oz * cos;
+                newPos[0] = Math.round((targetItem.position[0] + deltaPos[0] + rx) * 10000) / 10000;
+                newPos[2] = Math.round((targetItem.position[2] + deltaPos[2] + rz) * 10000) / 10000;
+              }
+
+              return {
+                ...item,
+                position: newPos,
+                rotation: [
+                  item.rotation[0],
+                  Math.round((item.rotation[1] + deltaRotY) * 10000) / 10000,
+                  item.rotation[2],
+                ],
+              };
+            }
+            return item;
+          })
+        );
+        return;
+      }
+
       setItems((prev) =>
         prev.map((item) =>
           item.id === id
             ? {
-              ...item,
-              position: position || item.position,
-              rotation: rotation || item.rotation,
-            }
+                ...item,
+                position: position || item.position,
+                rotation: rotation || item.rotation,
+              }
             : item
         )
       );
@@ -249,10 +372,10 @@ export function useSectorState() {
     [items, pushHistory]
   );
 
-  // Duplicate item (supports single and multi-selection)
+  // Duplicate item (supports single and multi-selection, preserving groups)
   const duplicateItem = useCallback(
     (id) => {
-      const idsToDup =
+      let idsToDup =
         selectedIds.length > 1 && (!id || selectedIds.includes(id))
           ? selectedIds
           : id
@@ -261,29 +384,72 @@ export function useSectorState() {
 
       if (idsToDup.length === 0) return;
 
+      // Expand to include the entire group for any grouped item (e.g. Gaveta G multiplication)
+      const groupIds = new Set();
+      idsToDup.forEach((tid) => {
+        const it = items.find((x) => x.id === tid);
+        const gid = it?.groupId || it?.props?.groupId;
+        if (gid) groupIds.add(gid);
+      });
+
+      if (groupIds.size > 0) {
+        const extraIds = items
+          .filter((it) => {
+            const gid = it.groupId || it.props?.groupId;
+            return gid && groupIds.has(gid);
+          })
+          .map((it) => it.id);
+        idsToDup = [...new Set([...idsToDup, ...extraIds])];
+      }
+
       pushHistory(items);
       const timestamp = Date.now();
       const newItems = [];
       const newIds = [];
+      const groupMap = {};
+
+      const existingNumbers = items
+        .filter((it) => it.type === "drawer_g")
+        .map((it) => {
+          const m = it.name?.match(/Gaveta\s+G\s+(\d+)/i);
+          return m ? parseInt(m[1], 10) : 0;
+        });
+      let nextDrawerNumber = Math.max(0, ...existingNumbers) + 1;
 
       idsToDup.forEach((targetId, idx) => {
         const target = items.find((it) => it.id === targetId);
         if (!target) return;
         const newId = `${target.type}-${timestamp}-${idx}`;
         newIds.push(newId);
+
+        let newGroupId = target.groupId || target.props?.groupId;
+        if (newGroupId) {
+          if (!groupMap[newGroupId]) {
+            groupMap[newGroupId] = `drawer_group_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+          }
+          newGroupId = groupMap[newGroupId];
+        }
+
+        let itemName = target.name;
+        if (target.type === "drawer_g") {
+          itemName = `Gaveta G ${nextDrawerNumber++}`;
+        } else if (!itemName?.includes("(Cópia)")) {
+          itemName = `${itemName || target.type} (Cópia)`;
+        }
+
         newItems.push({
           ...JSON.parse(JSON.stringify(target)),
           id: newId,
-          name: target.name?.includes("(Cópia)")
-            ? target.name
-            : `${target.name} (Cópia)`,
+          groupId: newGroupId || target.groupId,
+          name: itemName,
           position: [
-            Math.round((target.position[0] + 1.0) * 100) / 100,
-            target.position[1],
-            Math.round((target.position[2] + 1.0) * 100) / 100,
+            target.position?.[0] !== undefined ? target.position[0] : 0,
+            target.position?.[1] !== undefined ? target.position[1] : 0,
+            target.position?.[2] !== undefined ? target.position[2] : 0,
           ],
           props: {
             ...(target.props ? JSON.parse(JSON.stringify(target.props)) : {}),
+            groupId: newGroupId || target.props?.groupId,
             colorSeed: Math.random(),
           },
         });
@@ -291,20 +457,123 @@ export function useSectorState() {
 
       if (newItems.length > 0) {
         setItems((prev) => [...prev, ...newItems]);
-        setSelectedIds(newIds);
+        setSelectedIds(newIds.length > 0 ? [newIds[0]] : []);
         setTransformMode("translate");
       }
     },
     [items, selectedIds, pushHistory]
   );
 
-  // Multiplicar colunas de BoxModel lateralmente conectando os varais
+  // Multiplicar colunas lateralmente (BoxModel conectando varais ou Gaveta G multiplicando torres)
   const multiplyColumns = useCallback(
     (id, count = 2) => {
       const target = items.find((it) => it.id === id);
       if (!target || count < 2) return;
 
       pushHistory(items);
+
+      if (target.type === "drawer_g") {
+        const targetGroupId = target.groupId || target.props?.groupId;
+        const now = Date.now();
+        const masterGroupId = targetGroupId || `drawer_group_${now}`;
+
+        // Localizar todas as gavetas pertencentes à mesma coluna da gaveta alvo (mesmo X e Z aproximados)
+        const colItems = items.filter((it) => {
+          if (it.type !== "drawer_g") return false;
+          if (
+            targetGroupId &&
+            (it.groupId === targetGroupId || it.props?.groupId === targetGroupId)
+          ) {
+            const dx = Math.abs((it.position?.[0] ?? 0) - (target.position?.[0] ?? 0));
+            const dz = Math.abs((it.position?.[2] ?? 0) - (target.position?.[2] ?? 0));
+            return dx < 0.05 && dz < 0.05;
+          }
+          return it.id === target.id;
+        });
+
+        const sourceDrawers = colItems.length > 0 ? colItems : [target];
+        sourceDrawers.sort(
+          (a, b) => (a.props?.tierIndex ?? 0) - (b.props?.tierIndex ?? 0)
+        );
+
+        // Dimensões físicas da Gaiola / Gaveta G
+        const tamanho = Number(target.props?.tamanho) || 18;
+        const scaleFactor = Math.max(0.01, tamanho / 10);
+        const W = Math.max(0.15, Number(target.props?.width) || 0.31);
+        const sideGap = 0.008;
+        const barSize = 0.012;
+        const cageW = W + sideGap * 2 + barSize * 2; // 0.35m
+        const larguraTotal = cageW * scaleFactor; // 0.63m
+        const GAP_X = 0.005; // 5mm de folga entre as estruturas metálicas
+        const PASSO_COLUNA = larguraTotal + GAP_X;
+
+        const rot = target.rotation || [0, 0, 0];
+        const dir = new THREE.Vector3(PASSO_COLUNA, 0, 0).applyEuler(
+          new THREE.Euler(rot[0] || 0, rot[1] || 0, rot[2] || 0)
+        );
+
+        // Identifica maior número de Gaveta G existente no cenário para numeração sequencial
+        const existingNumbers = items
+          .filter((it) => it.type === "drawer_g")
+          .map((it) => {
+            const m = it.name?.match(/Gaveta\s+G\s+(\d+)/i);
+            return m ? parseInt(m[1], 10) : 0;
+          });
+        let nextNumber = Math.max(0, ...existingNumbers) + 1;
+
+        const newItems = [];
+        for (let c = 1; c < count; c++) {
+          sourceDrawers.forEach((drawer, tierIdx) => {
+            const newId = `drawer_g-${now}-c${c}-${tierIdx + 1}`;
+            const newPos = [
+              Math.round((drawer.position[0] + c * dir.x) * 10000) / 10000,
+              drawer.position[1],
+              Math.round((drawer.position[2] + c * dir.z) * 10000) / 10000,
+            ];
+            const newName = `Gaveta G ${nextNumber++}`;
+
+            newItems.push({
+              id: newId,
+              type: "drawer_g",
+              groupId: masterGroupId,
+              name: newName,
+              position: newPos,
+              rotation: [...(drawer.rotation || rot)],
+              props: {
+                ...JSON.parse(JSON.stringify(drawer.props || {})),
+                groupId: masterGroupId,
+                tierIndex: drawer.props?.tierIndex ?? tierIdx,
+              },
+            });
+          });
+        }
+
+        setItems((prev) => {
+          const updated = prev.map((it) => {
+            if (
+              it.id === target.id ||
+              (targetGroupId &&
+                (it.groupId === targetGroupId ||
+                  it.props?.groupId === targetGroupId))
+            ) {
+              return {
+                ...it,
+                groupId: masterGroupId,
+                props: {
+                  ...it.props,
+                  groupId: masterGroupId,
+                },
+              };
+            }
+            return it;
+          });
+          return [...updated, ...newItems];
+        });
+
+        // Mantém a gaveta alvo selecionada para permitir edição/renomeação pontual
+        setSelectedIds([target.id]);
+        return;
+      }
 
       const CAIXA_LARGURA = 0.298096 * 1.95; // 0.5812872
       const GAP_X = 0.003; // Mesmo tamanho do gap vertical entre as caixas da mesma coluna (GAP_Y)
@@ -381,7 +650,7 @@ export function useSectorState() {
     [items, pushHistory]
   );
 
-  // Copy item to clipboard (Ctrl + C) - supports multiple items
+  // Copy item to clipboard (Ctrl + C) - supports multiple items and full group expansion
   const copyItem = useCallback(
     (id) => {
       const idsToCopy =
@@ -391,10 +660,31 @@ export function useSectorState() {
           ? [id]
           : selectedIds;
 
-      const targetList = items.filter((it) => idsToCopy.includes(it.id));
-      if (targetList.length === 0) return null;
+      if (idsToCopy.length === 0) return null;
 
-      const copy = JSON.parse(JSON.stringify(targetList));
+      // Expand to include the entire group for any grouped item (e.g. Gaveta G multiplication)
+      const groupIds = new Set();
+      idsToCopy.forEach((tid) => {
+        const it = items.find((x) => x.id === tid);
+        const gid = it?.groupId || it?.props?.groupId;
+        if (gid) groupIds.add(gid);
+      });
+
+      let fullList = items.filter((it) => idsToCopy.includes(it.id));
+      if (groupIds.size > 0) {
+        const groupItems = items.filter((it) => {
+          const gid = it.groupId || it.props?.groupId;
+          return gid && groupIds.has(gid);
+        });
+        const map = new Map();
+        fullList.forEach((it) => map.set(it.id, it));
+        groupItems.forEach((it) => map.set(it.id, it));
+        fullList = Array.from(map.values());
+      }
+
+      if (fullList.length === 0) return null;
+
+      const copy = JSON.parse(JSON.stringify(fullList));
       clipboardRef.current = copy;
       if (typeof window !== "undefined") {
         try {
@@ -408,7 +698,7 @@ export function useSectorState() {
     [items, selectedIds]
   );
 
-  // Paste item from clipboard (Ctrl + V) - supports multiple items
+  // Paste item from clipboard (Ctrl + V) - creates an independent copy with fresh group IDs
   const pasteItem = useCallback(() => {
     let targets = clipboardRef.current;
     if (!targets && typeof window !== "undefined") {
@@ -432,26 +722,56 @@ export function useSectorState() {
     const timestamp = Date.now();
     const newItems = [];
     const newIds = [];
+    const groupMap = {};
+
+    // Calculate sequential numbering for Gaveta G if copying drawer_g
+    const existingNumbers = items
+      .filter((it) => it.type === "drawer_g")
+      .map((it) => {
+        const m = it.name?.match(/Gaveta\s+G\s+(\d+)/i);
+        return m ? parseInt(m[1], 10) : 0;
+      });
+    let nextDrawerNumber = Math.max(0, ...existingNumbers) + 1;
 
     list.forEach((target, idx) => {
       const newId = `${target.type}-${timestamp}-${idx}`;
       newIds.push(newId);
+
+      let newGroupId = target.groupId || target.props?.groupId;
+      if (newGroupId) {
+        if (!groupMap[newGroupId]) {
+          groupMap[newGroupId] = `drawer_group_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+        }
+        newGroupId = groupMap[newGroupId];
+      }
+
+      let itemName = target.name;
+      if (target.type === "drawer_g") {
+        itemName = `Gaveta G ${nextDrawerNumber++}`;
+      } else if (!itemName?.includes("(Cópia)")) {
+        itemName = `${itemName || target.type} (Cópia)`;
+      }
+
       newItems.push({
         ...JSON.parse(JSON.stringify(target)),
         id: newId,
-        name: target.name?.includes("(Cópia)")
-          ? target.name
-          : `${target.name || target.type} (Cópia)`,
+        groupId: newGroupId || target.groupId,
+        name: itemName,
         position: [
-          Math.round(((target.position?.[0] || 0) + 1.0) * 100) / 100,
-          target.position?.[1] || 0,
-          Math.round(((target.position?.[2] || 0) + 1.0) * 100) / 100,
+          target.position?.[0] !== undefined ? target.position[0] : 0,
+          target.position?.[1] !== undefined ? target.position[1] : 0,
+          target.position?.[2] !== undefined ? target.position[2] : 0,
         ],
+        props: {
+          ...(target.props ? JSON.parse(JSON.stringify(target.props)) : {}),
+          groupId: newGroupId || target.props?.groupId,
+          colorSeed: Math.random(),
+        },
       });
     });
 
     setItems((prev) => [...prev, ...newItems]);
-    setSelectedIds(newIds);
+    setSelectedIds(newIds.length > 0 ? [newIds[0]] : []);
     setTransformMode("translate");
 
     clipboardRef.current = newItems;
@@ -480,10 +800,10 @@ export function useSectorState() {
     return true;
   }, [items]);
 
-  // Remove item (supports single or multi-selected items)
+  // Remove item (supports single or multi-selected items, and cleans up full group)
   const removeItem = useCallback(
     (id) => {
-      const idsToRemove =
+      let idsToRemove =
         selectedIds.length > 1 && (!id || selectedIds.includes(id))
           ? selectedIds
           : id
@@ -491,6 +811,21 @@ export function useSectorState() {
           : selectedIds;
 
       if (idsToRemove.length === 0) return;
+
+      // Se algum item pertencer a um grupo (ex: torre de Gaveta G), remove todos do grupo juntos
+      const groupIds = new Set();
+      idsToRemove.forEach((tid) => {
+        const it = items.find((x) => x.id === tid);
+        const gid = it?.groupId || it?.props?.groupId;
+        if (gid) groupIds.add(gid);
+      });
+
+      if (groupIds.size > 0) {
+        const extraIds = items
+          .filter((it) => groupIds.has(it.groupId || it.props?.groupId))
+          .map((it) => it.id);
+        idsToRemove = [...new Set([...idsToRemove, ...extraIds])];
+      }
 
       pushHistory(items);
       setItems((prev) => prev.filter((it) => !idsToRemove.includes(it.id)));

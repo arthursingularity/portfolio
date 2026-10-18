@@ -40,7 +40,7 @@ export default function BlenderModalTransform({
   onUpdateTransform,
   onUpdateTransforms,
   snapToGrid = true,
-  gridSnapSize = 0.1,
+  gridSnapSize = 0.05,
   orbitControlsRef,
   onModalActiveChange,
   onModalInfoChange,
@@ -283,8 +283,8 @@ export default function BlenderModalTransform({
       let newY = p0.y;
       let newZ = p0.z;
 
-      const step = s.snapToGrid ? s.gridSnapSize || 0.1 : 0.1;
-      const snapVal = (val, st) => Math.round(Math.round(val / st) * st * 10) / 10;
+      const step = s.snapToGrid ? s.gridSnapSize || 0.05 : 0.05;
+      const snapVal = (val, st) => Math.round(Math.round(val / st) * st * 1000) / 1000;
 
       if (s.axisLock === "x") {
         const t = projectRayOntoAxis(ray, p0, new THREE.Vector3(1, 0, 0));

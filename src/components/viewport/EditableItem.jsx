@@ -4,13 +4,12 @@ import React, { useRef, useEffect, useState, useCallback } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { TransformControls } from "@react-three/drei";
-import RackModel from "./models/RackModel";
 import PalletModel from "./models/PalletModel";
-import CargoModel from "./models/CargoModel";
 import FloorModel from "./models/FloorModel";
-import ForkliftModel from "./models/ForkliftModel";
-import ColumnModel from "./models/ColumnModel";
 import BoxModel from "./models/BoxModel";
+import DrawerGModel from "./models/DrawerGModel";
+import WallModel from "./models/WallModel";
+import BarModel from "./models/BarModel";
 import HoverBoundingBox from "./HoverBoundingBox";
 
 export default function EditableItem({
@@ -23,13 +22,17 @@ export default function EditableItem({
   onSelect,
   onUpdateTransform,
   onUpdateTransforms,
+  onUpdateProps,
   selectedItems = [],
+  allItems = [],
   targetRegistryRef,
   transformMode = "translate",
+  axisLock = null,
   snapToGrid = true,
-  gridSnapSize = 0.1,
+  gridSnapSize = 0.05,
   orbitControlsRef,
   hideGizmo = false,
+  justFinishedBoxDragRef,
 }) {
   // Use state for target mesh so TransformControls re-renders immediately on mount
   const [target, setTarget] = useState(null);
@@ -122,6 +125,14 @@ export default function EditableItem({
   useEffect(() => {
     if (!transformRef.current) return;
     const controls = transformRef.current;
+    controls.showX = !axisLock || axisLock === "x";
+    controls.showY = !axisLock || axisLock === "z";
+    controls.showZ = !axisLock || axisLock === "y";
+  }, [axisLock]);
+
+  useEffect(() => {
+    if (!transformRef.current) return;
+    const controls = transformRef.current;
     controls._conesFixed = false;
     fixGizmoCones(controls);
 
@@ -140,21 +151,36 @@ export default function EditableItem({
         if (target) {
           dragStartData.startPos = target.position.clone();
           dragStartData.startRot = target.rotation.clone();
-          dragStartData.others = (selectedItems || [])
-            .filter((it) => it.id !== item.id)
-            .map((it) => {
-              const node = targetRegistryRef?.current?.[it.id];
-              return {
-                id: it.id,
-                node,
-                initialPos: node
-                  ? node.position.clone()
-                  : new THREE.Vector3(...it.position),
-                initialRot: node
-                  ? node.rotation.clone()
-                  : new THREE.Euler(...it.rotation),
-              };
-            });
+
+          // Move together: any explicitly selected items AND any items in the same group (e.g. Gaveta G)
+          const groupId = item.groupId || item.props?.groupId;
+          const candidateList =
+            allItems && allItems.length > 0 ? allItems : selectedItems || [];
+
+          const otherItems = candidateList.filter((it) => {
+            if (it.id === item.id) return false;
+            if (selectedItems?.some((s) => s.id === it.id)) return true;
+            if (
+              groupId &&
+              (it.groupId === groupId || it.props?.groupId === groupId)
+            )
+              return true;
+            return false;
+          });
+
+          dragStartData.others = otherItems.map((it) => {
+            const node = targetRegistryRef?.current?.[it.id];
+            return {
+              id: it.id,
+              node,
+              initialPos: node
+                ? node.position.clone()
+                : new THREE.Vector3(...it.position),
+              initialRot: node
+                ? node.rotation.clone()
+                : new THREE.Euler(...it.rotation),
+            };
+          });
         }
       } else {
         // Drag END: Save final positions and rotations of all selected items
@@ -179,21 +205,39 @@ export default function EditableItem({
           ];
 
           dragStartData.others.forEach((other) => {
-            const finalPos = other.node
-              ? other.node.position
-              : other.initialPos.clone().add(deltaPos);
-            const finalRot = other.node ? other.node.rotation : other.initialRot;
+            let finalPos = other.node ? other.node.position : null;
+            let finalRot = other.node ? other.node.rotation : null;
+            if (!finalPos) {
+              if (transformMode === "rotate") {
+                const offset = other.initialPos.clone().sub(dragStartData.startPos);
+                offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), deltaRotY);
+                finalPos = dragStartData.startPos.clone().add(offset);
+              } else {
+                finalPos = other.initialPos.clone().add(deltaPos);
+              }
+            }
+            if (!finalRot) {
+              if (transformMode === "rotate") {
+                finalRot = new THREE.Euler(
+                  other.initialRot.x,
+                  other.initialRot.y + deltaRotY,
+                  other.initialRot.z
+                );
+              } else {
+                finalRot = other.initialRot;
+              }
+            }
             updates.push({
               id: other.id,
               position: [
-                Math.round(finalPos.x * 100) / 100,
-                Math.round(finalPos.y * 100) / 100,
-                Math.round(finalPos.z * 100) / 100,
+                Math.round(finalPos.x * 10000) / 10000,
+                Math.round(finalPos.y * 10000) / 10000,
+                Math.round(finalPos.z * 10000) / 10000,
               ],
               rotation: [
-                Math.round(finalRot.x * 100) / 100,
-                Math.round(finalRot.y * 100) / 100,
-                Math.round(finalRot.z * 100) / 100,
+                Math.round(finalRot.x * 10000) / 10000,
+                Math.round(finalRot.y * 10000) / 10000,
+                Math.round(finalRot.z * 10000) / 10000,
               ],
             });
           });
@@ -244,6 +288,8 @@ export default function EditableItem({
     onUpdateTransform,
     onUpdateTransforms,
     selectedItems,
+    allItems,
+    item.groupId,
     targetRegistryRef,
     transformMode,
   ]);
@@ -258,20 +304,17 @@ export default function EditableItem({
 
   const renderModel = () => {
     switch (item.type) {
-      case "rack":
-        return <RackModel {...item.props} />;
       case "pallet":
         return <PalletModel {...item.props} />;
-      case "cargo_red":
-        return <CargoModel cargoType="red" {...item.props} />;
-      case "cargo_gray":
-        return <CargoModel cargoType="gray" {...item.props} />;
       case "floor":
-        return <FloorModel {...item.props} />;
-      case "forklift":
-        return <ForkliftModel {...item.props} />;
-      case "column":
-        return <ColumnModel {...item.props} />;
+        return (
+          <FloorModel
+            {...item.props}
+            itemId={item.id}
+            onUpdateProps={onUpdateProps}
+            orbitControlsRef={orbitControlsRef}
+          />
+        );
       case "box":
         return (
           <BoxModel
@@ -282,6 +325,12 @@ export default function EditableItem({
             name={item.name}
           />
         );
+      case "drawer_g":
+        return <DrawerGModel {...item.props} />;
+      case "wall":
+        return <WallModel {...item.props} />;
+      case "bar":
+        return <BarModel {...item.props} />;
       default:
         return null;
     }
@@ -294,56 +343,50 @@ export default function EditableItem({
       <group
         ref={setTargetCallback}
         onClick={(e) => {
+          if (justFinishedBoxDragRef?.current) return;
           e.stopPropagation();
           onSelect(item.id, e.shiftKey || e.ctrlKey || e.metaKey);
         }}
         onPointerOver={(e) => {
-          e.stopPropagation();
-          onPointerOverItem?.(item.id);
-          setLocalHovered(true);
-          document.body.style.cursor = "pointer";
+          if (!item.props?.markingMode) {
+            e.stopPropagation();
+            onPointerOverItem?.(item.id);
+            setLocalHovered(true);
+            document.body.style.cursor = "pointer";
+          }
         }}
         onPointerOut={() => {
-          onPointerOutItem?.(item.id);
-          setLocalHovered(false);
-          document.body.style.cursor = "default";
+          if (!item.props?.markingMode) {
+            onPointerOutItem?.(item.id);
+            setLocalHovered(false);
+            document.body.style.cursor = "default";
+          }
         }}
       >
         {renderModel()}
 
-        {/* 3D Blue Bounding Box Outline on Hover or when Selected */}
-        {(isHovered || isSelected) && target && (
+        {/* 3D Blue Bounding Box Outline on Hover or when Selected (hides during floor marking mode) */}
+        {(isHovered || isSelected) && target && !item.props?.markingMode && (
           <HoverBoundingBox
             target={target}
             itemProps={item.props}
             color="#38bdf8"
           />
         )}
-
-        {/* Selection Indicator Ring (raycast disabled so it never interferes with hover) */}
-        {isSelected && (
-          <mesh
-            name="__helper_selection_ring"
-            userData={{ isHelper: true }}
-            position={[0, 0.02, 0]}
-            rotation={[-Math.PI / 2, 0, 0]}
-            raycast={() => null}
-          >
-            <ringGeometry args={[0.7, 0.74, 32]} />
-            <meshBasicMaterial color="#3b82f6" depthTest={false} transparent opacity={0.8} />
-          </mesh>
-        )}
       </group>
 
-      {/* 3D Transform Gizmo for primary active item - mounts immediately when selected, hides during modal G move */}
-      {isSelected && isPrimarySelected && target && !hideGizmo && (
+      {/* 3D Transform Gizmo for primary active item - mounts immediately when selected, hides during marking mode or select mode */}
+      {isSelected && isPrimarySelected && target && !hideGizmo && !item.props?.markingMode && transformMode !== "select" && (
         <TransformControls
           ref={setTransformRef}
           object={target}
           mode={transformMode}
-          translationSnap={snapToGrid ? (gridSnapSize || 0.1) : null}
-          rotationSnap={snapToGrid ? 0.1 : null}
+          translationSnap={snapToGrid ? (gridSnapSize || 0.05) : null}
+          rotationSnap={snapToGrid ? 0.05 : null}
           size={0.85}
+          showX={!axisLock || axisLock === "x"}
+          showY={!axisLock || axisLock === "z"}
+          showZ={!axisLock || axisLock === "y"}
         />
       )}
     </>

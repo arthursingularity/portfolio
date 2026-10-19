@@ -10,6 +10,8 @@ import BoxModel from "./models/BoxModel";
 import DrawerGModel from "./models/DrawerGModel";
 import WallModel from "./models/WallModel";
 import BarModel from "./models/BarModel";
+import CubeModel from "./models/CubeModel";
+import JoinedModel from "./models/JoinedModel";
 import HoverBoundingBox from "./HoverBoundingBox";
 
 export default function EditableItem({
@@ -28,6 +30,7 @@ export default function EditableItem({
   targetRegistryRef,
   transformMode = "translate",
   axisLock = null,
+  isModalGrab = false,
   snapToGrid = true,
   gridSnapSize = 0.05,
   orbitControlsRef,
@@ -294,13 +297,18 @@ export default function EditableItem({
     transformMode,
   ]);
 
-  // Keep group position synced with state
+  // Keep group position, rotation, and scale synced with state
   useEffect(() => {
     if (target) {
       target.position.set(...item.position);
       target.rotation.set(...item.rotation);
+      if (item.scale) {
+        target.scale.set(...item.scale);
+      } else {
+        target.scale.set(1, 1, 1);
+      }
     }
-  }, [item.position, item.rotation, target]);
+  }, [item.position, item.rotation, item.scale, target]);
 
   const renderModel = () => {
     switch (item.type) {
@@ -331,6 +339,10 @@ export default function EditableItem({
         return <WallModel {...item.props} />;
       case "bar":
         return <BarModel {...item.props} />;
+      case "cube":
+        return <CubeModel {...item.props} />;
+      case "joined":
+        return <JoinedModel {...item.props} />;
       default:
         return null;
     }
@@ -343,6 +355,12 @@ export default function EditableItem({
       <group
         ref={setTargetCallback}
         onClick={(e) => {
+          if (
+            document.activeElement?.tagName === "INPUT" ||
+            document.activeElement?.tagName === "TEXTAREA"
+          ) {
+            document.activeElement.blur();
+          }
           if (justFinishedBoxDragRef?.current) return;
           e.stopPropagation();
           onSelect(item.id, e.shiftKey || e.ctrlKey || e.metaKey);
@@ -375,8 +393,8 @@ export default function EditableItem({
         )}
       </group>
 
-      {/* 3D Transform Gizmo for primary active item - mounts immediately when selected, hides during marking mode or select mode */}
-      {isSelected && isPrimarySelected && target && !hideGizmo && !item.props?.markingMode && transformMode !== "select" && (
+      {/* 3D Transform Gizmo for primary active item - mounts immediately when selected, hides during marking mode, select mode, size mode, axis lock, or modal grab */}
+      {isSelected && isPrimarySelected && target && !hideGizmo && !item.props?.markingMode && transformMode !== "select" && transformMode !== "size" && !axisLock && !isModalGrab && (
         <TransformControls
           ref={setTransformRef}
           object={target}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import SceneCanvas from "./SceneCanvas";
 import ViewportHud from "./ViewportHud";
 import ModelProperties from "./ModelProperties";
@@ -11,7 +11,7 @@ import FpsCounter from "./FpsCounter";
 import TopBar from "./TopBar";
 import { useSectorState } from "./sectorState";
 import { saveSectorGlb } from "./exportGlb";
-import LeftBar from "./LeftBar";
+import LeftBar, { isModelResizable } from "./LeftBar";
 
 export default function SectorStudio() {
   const [cellSize, setCellSize] = useState(1);
@@ -64,6 +64,8 @@ export default function SectorStudio() {
     updateName,
     duplicateItem,
     multiplyColumns,
+    joinItems,
+    separateItem,
     removeItem,
     toggleVisibility,
     undo,
@@ -115,8 +117,41 @@ export default function SectorStudio() {
     y: 0,
   });
   const [axisLock, setAxisLock] = useState(null); // 'x' | 'y' | 'z' | null
+  const [isModalGrab, setIsModalGrab] = useState(false);
   const viewportRef = useRef(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
+
+  // Se mudar de seleção enquanto em modo 'size' para um objeto que não permite alterar tamanho, reseta para 'select'
+  useEffect(() => {
+    if (transformMode === "size") {
+      const activeTargets =
+        selectedItems && selectedItems.length > 0
+          ? selectedItems
+          : selectedItem
+          ? [selectedItem]
+          : [];
+      const canScale =
+        activeTargets.length > 0 &&
+        activeTargets.every((it) => isModelResizable(it));
+      if (!canScale) {
+        setTransformMode("select");
+      }
+    }
+  }, [selectedItem, selectedItems, transformMode, setTransformMode]);
+
+  const handleSetTransformMode = useCallback(
+    (mode) => {
+      setTransformMode(mode);
+      if (mode === "translate") {
+        setIsModalGrab(true);
+        setAxisLock(null);
+      } else {
+        setIsModalGrab(false);
+        setAxisLock(null);
+      }
+    },
+    [setTransformMode]
+  );
 
   // Keyboard shortcuts (Blender-like + Undo/Copy/Paste)
   useEffect(() => {
@@ -153,6 +188,11 @@ export default function SectorStudio() {
         e.preventDefault();
         pasteItem();
       }
+      // Ctrl + J (Juntar modelos selecionados - Blender Style)
+      else if ((e.ctrlKey || e.metaKey) && (e.key === "j" || e.key === "J")) {
+        e.preventDefault();
+        joinItems();
+      }
       // Shift + A (Menu de adicionar)
       else if (e.shiftKey && (e.key === "a" || e.key === "A")) {
         e.preventDefault();
@@ -168,6 +208,7 @@ export default function SectorStudio() {
         e.key === "B"
       ) {
         setTransformMode("select");
+        setIsModalGrab(false);
         setAxisLock(null);
       } else if (
         e.key === "g" ||
@@ -176,18 +217,43 @@ export default function SectorStudio() {
         e.key === "T"
       ) {
         setTransformMode("translate");
+        setIsModalGrab(true);
         setAxisLock(null);
       } else if (e.key === "r" || e.key === "R") {
         setTransformMode("rotate");
+        setIsModalGrab(false);
         setAxisLock(null);
+      } else if (
+        (e.key === "s" || e.key === "S") &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      ) {
+        const activeTargets =
+          selectedItems && selectedItems.length > 0
+            ? selectedItems
+            : selectedItem
+            ? [selectedItem]
+            : [];
+        const canScale =
+          activeTargets.length > 0 &&
+          activeTargets.every((it) => isModelResizable(it));
+
+        if (canScale) {
+          e.preventDefault();
+          setIsModalGrab(false);
+          setTransformMode("size");
+          setAxisLock(null);
+        }
       } else if (
         (e.key === "x" || e.key === "X") &&
         !e.ctrlKey &&
         !e.metaKey &&
         !e.shiftKey
       ) {
-        if (transformMode === "translate" && (selectedIds.length > 0 || selectedId)) {
+        if ((transformMode === "translate" || isModalGrab) && (selectedIds.length > 0 || selectedId)) {
           e.preventDefault();
+          setIsModalGrab(true);
           setAxisLock((cur) => (cur === "x" ? null : "x"));
         }
       } else if (
@@ -196,8 +262,9 @@ export default function SectorStudio() {
         !e.metaKey &&
         !e.shiftKey
       ) {
-        if (transformMode === "translate" && (selectedIds.length > 0 || selectedId)) {
+        if ((transformMode === "translate" || isModalGrab) && (selectedIds.length > 0 || selectedId)) {
           e.preventDefault();
+          setIsModalGrab(true);
           setAxisLock((cur) => (cur === "y" ? null : "y"));
         }
       } else if (
@@ -206,8 +273,9 @@ export default function SectorStudio() {
         !e.metaKey &&
         !e.shiftKey
       ) {
-        if (transformMode === "translate" && (selectedIds.length > 0 || selectedId)) {
+        if ((transformMode === "translate" || isModalGrab) && (selectedIds.length > 0 || selectedId)) {
           e.preventDefault();
+          setIsModalGrab(true);
           setAxisLock((cur) => (cur === "z" ? null : "z"));
         }
       } else if (
@@ -394,7 +462,7 @@ export default function SectorStudio() {
         gridVisible={gridVisible}
         setGridVisible={setGridVisible}
         transformMode={transformMode}
-        setTransformMode={setTransformMode}
+        setTransformMode={handleSetTransformMode}
         selectedCount={selectedIds.length}
         onSelectAll={() =>
           setSelectedIds(
@@ -414,9 +482,12 @@ export default function SectorStudio() {
           {/* Barra Lateral */}
           <LeftBar
             transformMode={transformMode}
-            setTransformMode={setTransformMode}
+            setTransformMode={handleSetTransformMode}
+            selectedItem={selectedItem}
+            selectedItems={selectedItems}
             onResetCamera={handleResetCamera}
             onAddItem={addItem}
+            onJoinModels={joinItems}
             isAddMenuOpen={contextMenu.isOpen}
             setIsAddMenuOpen={(open) =>
               setContextMenu((prev) => ({
@@ -454,7 +525,11 @@ export default function SectorStudio() {
             onUpdateTransforms={updateTransforms}
             onUpdateProps={updateProps}
             transformMode={transformMode}
+            setTransformMode={handleSetTransformMode}
             axisLock={axisLock}
+            setAxisLock={setAxisLock}
+            isModalGrab={isModalGrab}
+            setIsModalGrab={setIsModalGrab}
             snapToGrid={snapToGrid}
             controlsRef={controlsRef}
             exportGroupRef={exportGroupRef}
@@ -519,6 +594,7 @@ export default function SectorStudio() {
             onUpdateProps={updateProps}
             onUpdateName={updateName}
             onDuplicate={duplicateItem}
+            onSeparateItem={separateItem}
             onDelete={removeItem}
             onClose={() => setSelectedId(null)}
             onMultiplyColumns={multiplyColumns}

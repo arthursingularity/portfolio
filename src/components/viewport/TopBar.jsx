@@ -58,16 +58,16 @@ export default function TopBar({
       {/* ── 2. Linha Inferior: Menus e Abas de Workspaces ── */}
       <div
         ref={menuBarRef}
-        className="h-[25px] flex items-center px-1 justify-between bg-[#1e1e22] text-[12px] relative z-50"
+        className="h-[25px] flex items-center px-2.5 justify-between bg-[#1e1e22] text-[12px] relative z-50"
       >
         <div className="flex items-center h-full">
           {/* Logo Arthur */}
-          <div className="flex items-center justify-center px-1.5 text-white/90">
-            <img src={'/imagens/logo.svg'} className="h-[17px] w-fit shrink-0 buttonHover"/>
+          <div className="flex items-center justify-center">
+            <img src={'/imagens/logo.svg'} className="h-[15px] w-fit shrink-0 buttonHover"/>
           </div>
 
           {/* ── Menus Principais: File, Edit, Render, Window, Help ── */}
-          <div className="flex items-center h-full">
+          <div className="flex items-center h-full ml-1.5">
             {/* File */}
             <div className="relative h-full flex items-center">
               <button
@@ -227,40 +227,6 @@ export default function TopBar({
               )}
             </div>
 
-            {/* Render */}
-            <div className="relative h-full flex items-center">
-              <button
-                type="button"
-                onClick={() => toggleMenu("render")}
-                onMouseEnter={() => handleMenuHover("render")}
-                className={`px-2 py-0.5 rounded-[3px] text-zinc-300 hover:text-white cursor-pointer ${
-                  openMenu === "render" ? "bg-[#34343a] text-white" : "hover:bg-white/[0.06]"
-                }`}
-              >
-                Render
-              </button>
-              {openMenu === "render" && (
-                <div className="absolute top-full left-0 mt-0.5 w-48 bg-[#252528] border border-white/[0.10] rounded-md shadow-2xl py-1 z-50 text-[12px] text-zinc-200">
-                  <button
-                    type="button"
-                    onClick={closeMenus}
-                    className="w-full px-3 py-1 text-left flex items-center justify-between hover:bg-[#34343a] hover:text-white"
-                  >
-                    <span>Render Image</span>
-                    <span className="text-zinc-500 text-[11px]">F12</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={closeMenus}
-                    className="w-full px-3 py-1 text-left flex items-center justify-between hover:bg-[#34343a] hover:text-white"
-                  >
-                    <span>Render Animation</span>
-                    <span className="text-zinc-500 text-[11px]">Ctrl+F12</span>
-                  </button>
-                </div>
-              )}
-            </div>
-
             {/* Window */}
             <div className="relative h-full flex items-center">
               <button
@@ -271,7 +237,7 @@ export default function TopBar({
                   openMenu === "window" ? "bg-[#34343a] text-white" : "hover:bg-white/[0.06]"
                 }`}
               >
-                Window
+                Janela
               </button>
               {openMenu === "window" && (
                 <div className="absolute top-full left-0 mt-0.5 w-48 bg-[#252528] border border-white/[0.10] rounded-md shadow-2xl py-1 z-50 text-[12px] text-zinc-200">
@@ -319,7 +285,7 @@ export default function TopBar({
                   openMenu === "help" ? "bg-[#34343a] text-white" : "hover:bg-white/[0.06]"
                 }`}
               >
-                Help
+                Atalhos
               </button>
               {openMenu === "help" && (
                 <div className="absolute top-full left-0 mt-0.5 w-48 bg-[#252528] border border-white/[0.10] rounded-md shadow-2xl py-1 z-50 text-[12px] text-zinc-200">

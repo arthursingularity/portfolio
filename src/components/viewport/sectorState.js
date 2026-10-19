@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import * as THREE from "three";
+import { isModelResizable } from "./LeftBar";
 
 const STORAGE_KEY = "sector_studio_scene_data_v3";
 const CLIPBOARD_KEY = "sector_studio_clipboard_v1";
@@ -196,6 +197,16 @@ export function useSectorState() {
             color: "#383d42",
           };
           break;
+        case "cube":
+          newItem.name = `Cubo ${items.filter((it) => it.type === "cube").length + 1}`;
+          newItem.position = [0, 0, 0];
+          newItem.props = {
+            width: 1.0,
+            height: 1.0,
+            depth: 1.0,
+            color: "#3b82f6",
+          };
+          break;
         case "drawer_g": {
           pushHistory(items);
           const timestamp = Date.now();
@@ -246,7 +257,7 @@ export function useSectorState() {
 
   // Update single item transforms (syncs entire group when item has groupId)
   const updateTransform = useCallback(
-    (id, { position, rotation }) => {
+    (id, { position, rotation, scale }) => {
       pushHistory(items);
       const targetItem = items.find((it) => it.id === id);
       const groupId = targetItem?.groupId || targetItem?.props?.groupId;
@@ -269,6 +280,7 @@ export function useSectorState() {
                   ...item,
                   position: position || item.position,
                   rotation: rotation || item.rotation,
+                  scale: scale !== undefined ? scale : (item.scale || [1, 1, 1]),
                 };
               }
 
@@ -296,6 +308,7 @@ export function useSectorState() {
                   Math.round((item.rotation[1] + deltaRotY) * 10000) / 10000,
                   item.rotation[2],
                 ],
+                scale: scale !== undefined ? scale : (item.scale || [1, 1, 1]),
               };
             }
             return item;
@@ -311,6 +324,7 @@ export function useSectorState() {
                 ...item,
                 position: position || item.position,
                 rotation: rotation || item.rotation,
+                scale: scale !== undefined ? scale : (item.scale || [1, 1, 1]),
               }
             : item
         )
@@ -334,6 +348,7 @@ export function useSectorState() {
               ...item,
               position: match.position || item.position,
               rotation: match.rotation || item.rotation,
+              scale: match.scale !== undefined ? match.scale : (item.scale || [1, 1, 1]),
             };
           }
           return item;
@@ -834,6 +849,203 @@ export function useSectorState() {
     [items, selectedIds, pushHistory]
   );
 
+  // Juntar modelos (Join Models - Blender Ctrl+J)
+  const joinItems = useCallback(
+    (targetIds) => {
+      const idsToJoin =
+        targetIds && targetIds.length >= 2
+          ? targetIds
+          : selectedIds.length >= 2
+          ? selectedIds
+          : [];
+
+      if (idsToJoin.length < 2) return null;
+
+      const itemsToJoin = items.filter((it) => idsToJoin.includes(it.id));
+      if (itemsToJoin.length < 2) return null;
+
+      // Valida se todos os modelos permitem alteração de tamanho
+      const invalid = itemsToJoin.some((it) => !isModelResizable(it));
+      if (invalid) {
+        return null;
+      }
+
+      pushHistory(items);
+
+      // Decompõe cada item em peças no espaço global (world space)
+      const worldParts = [];
+      itemsToJoin.forEach((item) => {
+        if (item.type === "joined" && Array.isArray(item.props?.parts)) {
+          const parentMat = new THREE.Matrix4();
+          const pos = new THREE.Vector3(...item.position);
+          const eul = new THREE.Euler(...(item.rotation || [0, 0, 0]));
+          const quat = new THREE.Quaternion().setFromEuler(eul);
+          const scl = new THREE.Vector3(...(item.scale || [1, 1, 1]));
+          parentMat.compose(pos, quat, scl);
+
+          item.props.parts.forEach((p) => {
+            const partMat = new THREE.Matrix4();
+            const pPos = new THREE.Vector3(...(p.position || [0, 0, 0]));
+            const pEul = new THREE.Euler(...(p.rotation || [0, 0, 0]));
+            const pQuat = new THREE.Quaternion().setFromEuler(pEul);
+            const pScl = new THREE.Vector3(...(p.scale || [1, 1, 1]));
+            partMat.compose(pPos, pQuat, pScl);
+
+            const combinedMat = new THREE.Matrix4().multiplyMatrices(parentMat, partMat);
+            const wPos = new THREE.Vector3();
+            const wQuat = new THREE.Quaternion();
+            const wScl = new THREE.Vector3();
+            combinedMat.decompose(wPos, wQuat, wScl);
+            const wEul = new THREE.Euler().setFromQuaternion(wQuat);
+
+            worldParts.push({
+              id: p.id || `part_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+              type: p.type,
+              worldPos: [wPos.x, wPos.y, wPos.z],
+              worldRot: [wEul.x, wEul.y, wEul.z],
+              worldScale: [wScl.x, wScl.y, wScl.z],
+              props: JSON.parse(JSON.stringify(p.props || {})),
+            });
+          });
+        } else {
+          worldParts.push({
+            id: item.id,
+            type: item.type,
+            worldPos: [...item.position],
+            worldRot: [...(item.rotation || [0, 0, 0])],
+            worldScale: [...(item.scale || [1, 1, 1])],
+            props: JSON.parse(JSON.stringify(item.props || {})),
+          });
+        }
+      });
+
+      // Calcula o centroide médio de todas as peças
+      let sumX = 0, sumY = 0, sumZ = 0;
+      worldParts.forEach((wp) => {
+        sumX += wp.worldPos[0];
+        sumY += wp.worldPos[1];
+        sumZ += wp.worldPos[2];
+      });
+      const count = worldParts.length;
+      const centerX = Math.round((sumX / count) * 1000) / 1000;
+      const centerY = Math.round((sumY / count) * 1000) / 1000;
+      const centerZ = Math.round((sumZ / count) * 1000) / 1000;
+
+      // Converte as coordenadas das peças para espaço local relativo ao novo centro
+      const relativeParts = worldParts.map((wp) => ({
+        id: wp.id,
+        type: wp.type,
+        position: [
+          Math.round((wp.worldPos[0] - centerX) * 1000) / 1000,
+          Math.round((wp.worldPos[1] - centerY) * 1000) / 1000,
+          Math.round((wp.worldPos[2] - centerZ) * 1000) / 1000,
+        ],
+        rotation: wp.worldRot,
+        scale: wp.worldScale,
+        props: wp.props,
+      }));
+
+      const timestamp = Date.now();
+      const newJoinedItem = {
+        id: `joined_${timestamp}`,
+        type: "joined",
+        name: `União (${itemsToJoin.map((it) => it.name || it.type).join(" + ")})`,
+        position: [centerX, centerY, centerZ],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+        props: {
+          parts: relativeParts,
+        },
+      };
+
+      const idsToRemoveSet = new Set(itemsToJoin.map((it) => it.id));
+      setItems((prev) => [
+        ...prev.filter((it) => !idsToRemoveSet.has(it.id)),
+        newJoinedItem,
+      ]);
+      setSelectedIds([newJoinedItem.id]);
+      setTransformMode("translate");
+
+      return newJoinedItem;
+    },
+    [items, selectedIds, pushHistory, setTransformMode]
+  );
+
+  // Separar modelo unido (Desfazer união)
+  const separateItem = useCallback(
+    (id) => {
+      const targetId = id || selectedIds[0];
+      const target = items.find((it) => it.id === targetId);
+      if (!target || target.type !== "joined" || !Array.isArray(target.props?.parts)) {
+        return;
+      }
+
+      pushHistory(items);
+
+      const parentMat = new THREE.Matrix4();
+      const pos = new THREE.Vector3(...target.position);
+      const eul = new THREE.Euler(...(target.rotation || [0, 0, 0]));
+      const quat = new THREE.Quaternion().setFromEuler(eul);
+      const scl = new THREE.Vector3(...(target.scale || [1, 1, 1]));
+      parentMat.compose(pos, quat, scl);
+
+      const timestamp = Date.now();
+      const newItems = target.props.parts.map((p, idx) => {
+        const partMat = new THREE.Matrix4();
+        const pPos = new THREE.Vector3(...(p.position || [0, 0, 0]));
+        const pEul = new THREE.Euler(...(p.rotation || [0, 0, 0]));
+        const pQuat = new THREE.Quaternion().setFromEuler(pEul);
+        const pScl = new THREE.Vector3(...(p.scale || [1, 1, 1]));
+        partMat.compose(pPos, pQuat, pScl);
+
+        const combinedMat = new THREE.Matrix4().multiplyMatrices(parentMat, partMat);
+        const wPos = new THREE.Vector3();
+        const wQuat = new THREE.Quaternion();
+        const wScl = new THREE.Vector3();
+        combinedMat.decompose(wPos, wQuat, wScl);
+        const wEul = new THREE.Euler().setFromQuaternion(wQuat);
+
+        const typeName =
+          p.type === "wall"
+            ? "Parede"
+            : p.type === "bar"
+            ? "Barra"
+            : p.type === "cube"
+            ? "Cubo"
+            : p.type === "floor"
+            ? "Piso"
+            : "Modelo";
+
+        return {
+          id: `${p.type}-${timestamp}-${idx}`,
+          type: p.type,
+          name: `${typeName} ${idx + 1}`,
+          position: [
+            Math.round(wPos.x * 1000) / 1000,
+            Math.round(wPos.y * 1000) / 1000,
+            Math.round(wPos.z * 1000) / 1000,
+          ],
+          rotation: [
+            Math.round(wEul.x * 10000) / 10000,
+            Math.round(wEul.y * 10000) / 10000,
+            Math.round(wEul.z * 10000) / 10000,
+          ],
+          scale: [
+            Math.round(wScl.x * 1000) / 1000,
+            Math.round(wScl.y * 1000) / 1000,
+            Math.round(wScl.z * 1000) / 1000,
+          ],
+          props: JSON.parse(JSON.stringify(p.props || {})),
+        };
+      });
+
+      const newIds = newItems.map((it) => it.id);
+      setItems((prev) => [...prev.filter((it) => it.id !== target.id), ...newItems]);
+      setSelectedIds(newIds);
+    },
+    [items, selectedIds, pushHistory]
+  );
+
   // Toggle item visibility
   const toggleVisibility = useCallback(
     (id) => {
@@ -881,6 +1093,8 @@ export function useSectorState() {
     updateName,
     duplicateItem,
     multiplyColumns,
+    joinItems,
+    separateItem,
     removeItem,
     toggleVisibility,
     clearAll,

@@ -65,12 +65,16 @@ export default function TreeFolderSection({
         return <Icon icon="lucide:brick-wall" className="text-[14px] text-neutral-400" />;
       case "bar":
         return <Icon icon="lucide:square" className="text-[14px] text-neutral-400" />;
+      case "cube":
+        return <Icon icon="lucide:box" className="text-[14px] text-neutral-400" />;
       case "floor":
         return <Icon icon="akar-icons:square-fill" className="text-[14px] text-neutral-400" />;
       case "pallet":
         return <Icon icon="fa7-solid:pallet" className="text-[14px] text-neutral-400" />;
       case "drawer_g":
         return <Icon icon="lucide:inbox" className="text-[14px] text-neutral-400" />;
+      case "joined":
+        return <Icon icon="iconoven:blend-mode" className="text-[14px] text-primary-400" />;
       default:
         return <Icon icon="at-icons:cube" className="text-[14px] text-neutral-400" />;
     }

@@ -22,6 +22,7 @@ export default function ModelProperties({
   onDelete,
   onClose,
   onMultiplyColumns,
+  onSeparateItem,
 }) {
   const [boxMultiplier, setBoxMultiplier] = useState(3);
   const [drawerMultiplier, setDrawerMultiplier] = useState(2);
@@ -388,6 +389,191 @@ export default function ModelProperties({
 
               <ColorPicker
                 color={item.props.color || "#383d42"}
+                onChange={(newColor) =>
+                  onUpdateProps(item.id, { color: newColor })
+                }
+              />
+            </div>
+          </div>
+        )}
+
+        {/* ─── Propriedades do Cubo ─── */}
+        {item.type === "cube" && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2">
+              <span className="text-[12px] text-neutral-400">
+                Dimensões do Cubo
+              </span>
+
+              {/* Presets rápidos de tamanho */}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] text-neutral-500 font-mono">
+                  Padrões Rápidos (L x A x C):
+                </span>
+                <div className="grid grid-cols-4 gap-1">
+                  {[
+                    { label: "0.5m", w: 0.5, h: 0.5, d: 0.5 },
+                    { label: "1.0m", w: 1.0, h: 1.0, d: 1.0 },
+                    { label: "1.5m", w: 1.5, h: 1.5, d: 1.5 },
+                    { label: "2.0m", w: 2.0, h: 2.0, d: 2.0 },
+                  ].map((preset) => {
+                    const isMatch =
+                      Math.abs((item.props.width || 1.0) - preset.w) < 0.01 &&
+                      Math.abs((item.props.height || 1.0) - preset.h) < 0.01 &&
+                      Math.abs((item.props.depth || 1.0) - preset.d) < 0.01;
+                    return (
+                      <button
+                        key={preset.label}
+                        type="button"
+                        onClick={() =>
+                          onUpdateProps(item.id, {
+                            width: preset.w,
+                            height: preset.h,
+                            depth: preset.d,
+                          })
+                        }
+                        className={`py-1 px-1 rounded border text-[10px] font-mono transition-colors ${
+                          isMatch
+                            ? "bg-white text-black border-white font-semibold"
+                            : "border-white/10 text-white/70 hover:bg-white/10"
+                        }`}
+                      >
+                        {preset.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Grid com Largura, Altura, Comprimento */}
+              <div className="grid grid-cols-3 gap-2 mt-1">
+                {/* Largura X */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-neutral-400">
+                    Largura (X)
+                  </span>
+                  <div className="flex items-center bg-[#121214] border border-white/[0.08] focus-within:border-white/25 rounded-md px-2 py-1 text-xs">
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="100"
+                      step="0.1"
+                      value={
+                        item.props.width !== undefined ? item.props.width : 1.0
+                      }
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        onUpdateProps(item.id, {
+                          width: isNaN(val) ? "" : Math.max(0.01, val),
+                        });
+                      }}
+                      className="w-full bg-transparent text-white outline-none font-mono"
+                      placeholder="1.0"
+                    />
+                    <span className="text-[10px] text-neutral-500 font-mono ml-1">
+                      m
+                    </span>
+                  </div>
+                </div>
+
+                {/* Altura Y */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-neutral-400">
+                    Altura (Y)
+                  </span>
+                  <div className="flex items-center bg-[#121214] border border-white/[0.08] focus-within:border-white/25 rounded-md px-2 py-1 text-xs">
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="100"
+                      step="0.1"
+                      value={
+                        item.props.height !== undefined
+                          ? item.props.height
+                          : 1.0
+                      }
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        onUpdateProps(item.id, {
+                          height: isNaN(val) ? "" : Math.max(0.01, val),
+                        });
+                      }}
+                      className="w-full bg-transparent text-white outline-none font-mono"
+                      placeholder="1.0"
+                    />
+                    <span className="text-[10px] text-neutral-500 font-mono ml-1">
+                      m
+                    </span>
+                  </div>
+                </div>
+
+                {/* Comprimento Z */}
+                <div className="flex flex-col gap-1">
+                  <span className="text-[11px] text-neutral-400">
+                    Compr. (Z)
+                  </span>
+                  <div className="flex items-center bg-[#121214] border border-white/[0.08] focus-within:border-white/25 rounded-md px-2 py-1 text-xs">
+                    <input
+                      type="number"
+                      min="0.01"
+                      max="100"
+                      step="0.1"
+                      value={
+                        item.props.depth !== undefined ? item.props.depth : 1.0
+                      }
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        onUpdateProps(item.id, {
+                          depth: isNaN(val) ? "" : Math.max(0.01, val),
+                        });
+                      }}
+                      className="w-full bg-transparent text-white outline-none font-mono"
+                      placeholder="1.0"
+                    />
+                    <span className="text-[10px] text-neutral-500 font-mono ml-1">
+                      m
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Linha divisória */}
+            <div className="h-[1px] w-auto bg-neutral-700/70 my-1" />
+
+            {/* Cor do Cubo */}
+            <div className="flex flex-col gap-2">
+              <span className="text-[12px] text-neutral-400">
+                Cor do Cubo
+              </span>
+
+              {/* Presets rápidos */}
+              <div className="flex gap-1.5 mb-1">
+                {[
+                  { name: "Azul Tecnológico", hex: "#3b82f6" },
+                  { name: "Cinza Claro", hex: "#e2e8f0" },
+                  { name: "Grafite Escuro", hex: "#374151" },
+                  { name: "Verde Esmeralda", hex: "#10b981" },
+                  { name: "Laranja Industrial", hex: "#ea580c" },
+                  { name: "Amarelo Âmbar", hex: "#f59e0b" },
+                ].map((c) => (
+                  <button
+                    key={c.hex}
+                    type="button"
+                    title={c.name}
+                    onClick={() => onUpdateProps(item.id, { color: c.hex })}
+                    className={`w-5 h-5 rounded border ${
+                      (item.props.color || "#3b82f6") === c.hex
+                        ? "border-white ring-1 ring-white"
+                        : "border-white/20 hover:border-white/60"
+                    }`}
+                    style={{ backgroundColor: c.hex }}
+                  />
+                ))}
+              </div>
+
+              <ColorPicker
+                color={item.props.color || "#3b82f6"}
                 onChange={(newColor) =>
                   onUpdateProps(item.id, { color: newColor })
                 }
@@ -1008,6 +1194,56 @@ export default function ModelProperties({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ─── Propriedades do Modelo Unido (JoinedModel) ─── */}
+        {item.type === "joined" && (
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[12px] text-neutral-400">
+                Modelo Combinado
+              </span>
+              <div className="bg-[#121214] border border-white/[0.08] rounded-md p-2 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                  <span>Peças Integradas:</span>
+                  <span className="font-mono text-white/90 font-medium">
+                    {item.props?.parts?.length || 0} modelos
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {item.props?.parts?.map((p, idx) => (
+                    <span
+                      key={p.id || idx}
+                      className="px-1.5 py-0.5 rounded text-[10px] bg-white/[0.06] border border-white/[0.08] text-neutral-300 font-mono"
+                    >
+                      {p.type === "wall" ? "Parede" : p.type === "bar" ? "Barra" : p.type === "cube" ? "Cubo" : p.type === "floor" ? "Piso" : p.type}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Linha divisória */}
+            <div className="h-[1px] w-auto bg-neutral-700/70" />
+
+            {/* Botão de Desfazer União / Separar Peças */}
+            {onSeparateItem && (
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] text-neutral-400">
+                  Desmembrar União
+                </span>
+                <button
+                  type="button"
+                  onClick={() => onSeparateItem(item.id)}
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/25 text-white/90 text-xs transition-colors cursor-pointer"
+                  title="Separar novamente os modelos individuais"
+                >
+                  <Icon icon="iconoven:blend-mode" className="text-sm text-primary-400" />
+                  <span>Separar Modelos</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

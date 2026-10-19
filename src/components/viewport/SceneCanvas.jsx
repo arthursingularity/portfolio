@@ -6,6 +6,9 @@ import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, GizmoHelper, GizmoViewport } from "@react-three/drei";
 import BlenderGrid from "./BlenderGrid";
 import EditableItem from "./EditableItem";
+import BlenderScaleModal from "./BlenderScaleModal";
+import BlenderGrabModal from "./BlenderGrabModal";
+import BlenderAxisGuide from "./BlenderAxisGuide";
 
 /**
  * Helper component inside Canvas to keep camera, viewport size, and renderer live
@@ -120,7 +123,11 @@ export default function SceneCanvas({
   onUpdateTransform = () => { },
   onUpdateTransforms = () => { },
   transformMode = "translate",
+  setTransformMode,
   axisLock = null,
+  setAxisLock,
+  isModalGrab = false,
+  setIsModalGrab,
   snapToGrid = true,
   onUpdateProps,
   controlsRef,
@@ -138,6 +145,8 @@ export default function SceneCanvas({
 
   const [selectionRect, setSelectionRect] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
+  const [scaleInfo, setScaleInfo] = useState(null);
+  const [grabInfo, setGrabInfo] = useState(null);
 
   const selectedItem = items.find((it) => it.id === selectedId);
   const activeSelectedIds =
@@ -158,6 +167,12 @@ export default function SceneCanvas({
   );
 
   const handlePointerDown = (e) => {
+    if (
+      document.activeElement?.tagName === "INPUT" ||
+      document.activeElement?.tagName === "TEXTAREA"
+    ) {
+      document.activeElement.blur();
+    }
     if (e.button !== 0) return; // Only LMB
     if (transformMode !== "select" || isFloorMarkingActive) return;
 
@@ -310,36 +325,128 @@ export default function SceneCanvas({
         />
       )}
 
-      {/* Indicador de Trava de Eixo Ativo para Mover */}
-      {axisLock && transformMode === "translate" && (
+      {/* Linha Guia e Indicador Visual SVG (Blender Scale / Grab) */}
+      {(scaleInfo || grabInfo) && (
+        <svg className="absolute inset-0 pointer-events-none z-20 w-full h-full">
+          {(() => {
+            const info = scaleInfo || grabInfo;
+            const strokeColor =
+              info.axisLock === "x"
+                ? "#f87171"
+                : info.axisLock === "y"
+                ? "#4ade80"
+                : info.axisLock === "z"
+                ? "#60a5fa"
+                : "#facc15";
+            return (
+              <>
+                <line
+                  x1={info.centerPos.x}
+                  y1={info.centerPos.y}
+                  x2={info.mousePos.x}
+                  y2={info.mousePos.y}
+                  stroke={strokeColor}
+                  strokeWidth="1.5"
+                  strokeDasharray="4 4"
+                  opacity="0.85"
+                />
+                <circle
+                  cx={info.centerPos.x}
+                  cy={info.centerPos.y}
+                  r="4"
+                  fill={strokeColor}
+                />
+              </>
+            );
+          })()}
+        </svg>
+      )}
+
+      {/* Badge de Status: Mover (G - Blender) */}
+      {grabInfo && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none flex items-center gap-2.5 bg-[#18181b]/95 border border-white/15 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur text-xs font-mono text-white">
           <span
             className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${
-              axisLock === "x"
+              grabInfo.axisLock === "x"
                 ? "bg-red-400"
-                : axisLock === "y"
+                : grabInfo.axisLock === "y"
                 ? "bg-green-400"
-                : "bg-blue-400"
+                : grabInfo.axisLock === "z"
+                ? "bg-blue-400"
+                : "bg-amber-400"
             }`}
           />
           <span className="font-semibold">
-            {axisLock === "x" && (
-              <span className="text-[#f87171]">Mover [Eixo X - Vermelho]</span>
-            )}
-            {axisLock === "y" && (
-              <span className="text-[#4ade80]">
-                Mover [Eixo Y - Verde / Profundidade]
+            {grabInfo.axisLock === "x" && (
+              <span className="text-[#f87171]">
+                Mover [Eixo X - Vermelho]: {grabInfo.deltaAmount >= 0 ? "+" : ""}
+                {grabInfo.deltaAmount.toFixed(2)}m
               </span>
             )}
-            {axisLock === "z" && (
+            {grabInfo.axisLock === "y" && (
+              <span className="text-[#4ade80]">
+                Mover [Eixo Y - Verde / Profundidade]: {grabInfo.deltaAmount >= 0 ? "+" : ""}
+                {grabInfo.deltaAmount.toFixed(2)}m
+              </span>
+            )}
+            {grabInfo.axisLock === "z" && (
               <span className="text-[#60a5fa]">
-                Mover [Eixo Z - Azul / Altura]
+                Mover [Eixo Z - Azul / Altura]: {grabInfo.deltaAmount >= 0 ? "+" : ""}
+                {grabInfo.deltaAmount.toFixed(2)}m
+              </span>
+            )}
+            {!grabInfo.axisLock && (
+              <span className="text-amber-300">
+                Mover [Livre]: {grabInfo.deltaAmount.toFixed(2)}m
               </span>
             )}
           </span>
           <span className="text-white/30">•</span>
           <span className="text-white/60 text-[11px]">
-            Arraste a seta ou use as setas do teclado | Pressione {axisLock.toUpperCase()} ou Esc para liberar
+            [X, Y, Z] Travar eixo | Shift: Precisão | Clique Esq / Enter / G: Confirmar | Esc / Clique Dir: Cancelar
+          </span>
+        </div>
+      )}
+
+      {/* Badge de Status da Escala (Blender) */}
+      {scaleInfo && (
+        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none flex items-center gap-2.5 bg-[#18181b]/95 border border-white/15 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur text-xs font-mono text-white">
+          <span
+            className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${
+              scaleInfo.axisLock === "x"
+                ? "bg-red-400"
+                : scaleInfo.axisLock === "y"
+                ? "bg-green-400"
+                : scaleInfo.axisLock === "z"
+                ? "bg-blue-400"
+                : "bg-amber-400"
+            }`}
+          />
+          <span className="font-semibold">
+            {scaleInfo.axisLock === "x" && (
+              <span className="text-[#f87171]">
+                Escalar [Eixo X - Largura]: {scaleInfo.factor.toFixed(2)}x
+              </span>
+            )}
+            {scaleInfo.axisLock === "y" && (
+              <span className="text-[#4ade80]">
+                Escalar [Eixo Y - Comprimento]: {scaleInfo.factor.toFixed(2)}x
+              </span>
+            )}
+            {scaleInfo.axisLock === "z" && (
+              <span className="text-[#60a5fa]">
+                Escalar [Eixo Z - Altura]: {scaleInfo.factor.toFixed(2)}x
+              </span>
+            )}
+            {!scaleInfo.axisLock && (
+              <span className="text-amber-300">
+                Escalar [Geral]: {scaleInfo.factor.toFixed(2)}x
+              </span>
+            )}
+          </span>
+          <span className="text-white/30">•</span>
+          <span className="text-white/60 text-[11px]">
+            [X, Y, Z] Travar eixo | Shift: Precisão | Clique Esq / Enter / S: Confirmar | Esc / Clique Dir: Cancelar
           </span>
         </div>
       )}
@@ -435,6 +542,7 @@ export default function SceneCanvas({
               targetRegistryRef={targetRegistryRef}
               transformMode={transformMode}
               axisLock={axisLock}
+              isModalGrab={isModalGrab}
               snapToGrid={snapToGrid}
               gridSnapSize={0.05}
               orbitControlsRef={activeControls}
@@ -443,6 +551,61 @@ export default function SceneCanvas({
             />
           ))}
         </group>
+
+        {/* Blender Modal Move / Grab (G + Axis X/Y/Z + Mouse Move) */}
+        <BlenderGrabModal
+          selectedItem={selectedItem}
+          selectedItems={activeSelectedItems}
+          allItems={items}
+          onUpdateTransform={onUpdateTransform}
+          onUpdateTransforms={onUpdateTransforms}
+          targetRegistryRef={targetRegistryRef}
+          orbitControlsRef={activeControls}
+          isGrabActive={Boolean(isModalGrab || (transformMode === "translate" && axisLock))}
+          axisLock={axisLock}
+          setAxisLock={setAxisLock}
+          snapToGrid={snapToGrid}
+          gridSnapSize={0.05}
+          onFinishGrab={() => {
+            setIsModalGrab?.(false);
+            setAxisLock?.(null);
+            setTransformMode?.("select");
+          }}
+          onGrabInfoChange={setGrabInfo}
+        />
+
+        {/* Blender Modal Scale (S + Axis X/Y/Z + Mouse Move) */}
+        <BlenderScaleModal
+          selectedItem={selectedItem}
+          selectedItems={activeSelectedItems}
+          onUpdateTransform={onUpdateTransform}
+          onUpdateTransforms={onUpdateTransforms}
+          onUpdateProps={onUpdateProps}
+          targetRegistryRef={targetRegistryRef}
+          orbitControlsRef={activeControls}
+          isScaleActive={transformMode === "size"}
+          axisLock={axisLock}
+          setAxisLock={setAxisLock}
+          onFinishScale={() => {
+            setAxisLock?.(null);
+            setTransformMode?.("select");
+          }}
+          onScaleInfoChange={setScaleInfo}
+        />
+
+        {/* 3D Infinite Blender Axis Guides */}
+        {grabInfo?.axisLock && (
+          <BlenderAxisGuide
+            pivot={grabInfo.pivot3D}
+            axis={grabInfo.axisLock}
+          />
+        )}
+        {scaleInfo?.axisLock && (
+          <BlenderAxisGuide
+            pivot={scaleInfo.pivot3D}
+            axis={scaleInfo.axisLock}
+          />
+        )}
 
         {/* Orbit Controls (LMB = Rotate when not in select mode, RMB = Pan, MMB = Rotate) */}
         <OrbitControls

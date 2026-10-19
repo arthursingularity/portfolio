@@ -35,6 +35,11 @@ const CATALOG_ITEMS = [
     name: "Barra",
     icon: "lucide:square",
   },
+  {
+    type: "cube",
+    name: "Cubo",
+    icon: "lucide:box",
+  },
 ];
 
 /* ─── Ferramentas de Transformação ─── */
@@ -64,6 +69,16 @@ const TRANSFORM_TOOLS = [
     iconClass: "text-[23px]",
   },
 ];
+
+/* ─── Modelos que Permitem Modificar Tamanho ─── */
+export const RESIZABLE_TYPES = ["wall", "bar", "floor", "joined", "cube"];
+
+export function isModelResizable(item) {
+  if (!item) return false;
+  const type = typeof item === "string" ? item : item.type;
+  if (!type) return false;
+  return RESIZABLE_TYPES.includes(type);
+}
 
 /* ─── Helpers Visuais ─── */
 const getToolbarBtnClass = (isActive) =>
@@ -153,9 +168,33 @@ export default function LeftBar({
   setIsAddMenuOpen: controlledSetIsOpen,
   transformMode = "translate",
   setTransformMode,
+  selectedItem = null,
+  selectedItems = [],
+  onJoinModels,
 }) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const triggerRef = useRef(null);
+
+  const activeItems =
+    selectedItems && selectedItems.length > 0
+      ? selectedItems
+      : selectedItem
+      ? [selectedItem]
+      : [];
+  const canResize =
+    activeItems.length > 0 && activeItems.every((it) => isModelResizable(it));
+
+  const canJoin =
+    activeItems.length >= 2 && activeItems.every((it) => isModelResizable(it));
+
+  let joinTitle = "Juntar modelos (Ctrl+J)";
+  if (activeItems.length === 0) {
+    joinTitle = "Juntar modelos - Selecione 2 modelos que permitem alterar tamanho";
+  } else if (activeItems.length === 1) {
+    joinTitle = "Juntar modelos - Selecione outro modelo (Shift+Clique) para juntar";
+  } else if (!canJoin) {
+    joinTitle = "Juntar modelos - Apenas modelos que permitem alterar tamanho podem ser unidos";
+  }
 
   const isAddMenuOpen =
     controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
@@ -178,17 +217,41 @@ export default function LeftBar({
     <div className="absolute left-1 top-1 flex flex-col space-y-1 items-center z-20 select-none">
       {/* Grupo: Ferramentas de Transformação */}
       <div className="bg-black/30 backdrop-blur-md rounded-md flex flex-col space-y-1 justify-center p-1 border border-neutral-800">
-        {TRANSFORM_TOOLS.map((tool) => (
-          <button
-            key={tool.mode}
-            type="button"
-            onClick={() => setTransformMode?.(tool.mode)}
-            title={tool.title}
-            className={getToolbarBtnClass(transformMode === tool.mode)}
-          >
-            <Icon icon={tool.icon} className={tool.iconClass} />
-          </button>
-        ))}
+        {TRANSFORM_TOOLS.map((tool) => {
+          const isSizeTool = tool.mode === "size";
+          const isDisabled = isSizeTool && !canResize;
+
+          let btnTitle = tool.title;
+          if (isSizeTool) {
+            if (activeItems.length === 0) {
+              btnTitle = "Modificar Tamanho (S) - Selecione um modelo que permita alterar tamanho";
+            } else if (!canResize) {
+              btnTitle = "Modificar Tamanho (S) - Este modelo não permite alterar tamanho";
+            }
+          }
+
+          return (
+            <button
+              key={tool.mode}
+              type="button"
+              disabled={isDisabled}
+              onClick={() => {
+                if (isDisabled) return;
+                setTransformMode?.(tool.mode);
+              }}
+              title={btnTitle}
+              className={`relative rounded w-[32px] h-[32px] flex items-center justify-center ${
+                isDisabled
+                  ? "opacity-70 cursor-not-allowed text-neutral-500"
+                  : transformMode === tool.mode
+                  ? "bg-neutral-600/70 text-primary-300 cursor-pointer"
+                  : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300 cursor-pointer"
+              }`}
+            >
+              <Icon icon={tool.icon} className={tool.iconClass} />
+            </button>
+          );
+        })}
       </div>
 
       {/* Grupo: Adicionar Modelo com ItemPalette Popover */}
@@ -215,11 +278,19 @@ export default function LeftBar({
         />
 
         <button
-          ref={triggerRef}
           type="button"
-          onClick={toggleMenu}
-          title="Adicionar modelo"
-          className={getToolbarBtnClass(isAddMenuOpen)}
+          disabled={!canJoin}
+          onClick={() => {
+            if (canJoin) {
+              onJoinModels?.();
+            }
+          }}
+          title={joinTitle}
+          className={`relative rounded w-[32px] h-[32px] flex items-center justify-center transition-all ${
+            !canJoin
+              ? "opacity-70 cursor-not-allowed text-neutral-500"
+              : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300 cursor-pointer"
+          }`}
         >
           <Icon icon="iconoven:blend-mode" className="text-[22px]" />
         </button>

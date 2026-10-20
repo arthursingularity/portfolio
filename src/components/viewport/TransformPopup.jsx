@@ -261,7 +261,7 @@ export default function TransformPopup({
             </span>
             <input
               type="number"
-              step="0.05"
+              step="0.025"
               value={posX}
               onFocus={() => setFocusedField("x")}
               onChange={(e) => {
@@ -288,7 +288,7 @@ export default function TransformPopup({
             </span>
             <input
               type="number"
-              step="0.05"
+              step="0.025"
               value={posY}
               onFocus={() => setFocusedField("y")}
               onChange={(e) => {
@@ -315,7 +315,7 @@ export default function TransformPopup({
             </span>
             <input
               type="number"
-              step="0.05"
+              step="0.025"
               value={posZ}
               onFocus={() => setFocusedField("z")}
               onChange={(e) => {

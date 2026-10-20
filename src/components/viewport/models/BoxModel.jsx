@@ -4,31 +4,15 @@ import React, { useMemo } from "react";
 import * as THREE from "three";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
-// ---------------------------------------------------------------------------
-// DIMENSÕES E ESCALA EXATAMENTE IGUAIS ÀS CAIXAS DE EstoqueModel.tsx
-// ---------------------------------------------------------------------------
-const FATOR_ESCALA = 1.95;
-const CAIXA_COMPRIMENTO = 0.466947 * FATOR_ESCALA; // L = 0.91054665 (Profundidade no eixo Z)
-const CAIXA_LARGURA = 0.298096 * FATOR_ESCALA;     // W = 0.5812872 (Largura no eixo X)
-const CAIXA_ALTURA = 0.193756 * FATOR_ESCALA;      // H = 0.3778242 (Altura no eixo Y)
-const GAP_Y = 0.003; // Separação vertical sutil entre caixas empilhadas
-
-// Hash determinístico para converter strings (ex: item.id) em número inteiro positivo
-function hashString(str) {
-  if (!str) return 1;
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash) + 1;
-}
-
-// Gerador pseudo-aleatório determinístico (retorna float entre 0 e 1)
-function pseudoRandom(seed) {
-  const x = Math.sin(seed) * 10000;
-  return x - Math.floor(x);
-}
+import {
+  CAIXA_COMPRIMENTO,
+  CAIXA_LARGURA,
+  CAIXA_ALTURA,
+  GAP_Y,
+  DEFAULT_BOX_COLOR,
+  resolveSeedBase,
+  createBoxMaterial,
+} from "./boxConfig";
 
 /**
  * Trilho com Caixas (Warehouse Stacking Rail)
@@ -48,7 +32,7 @@ export default function BoxModel({
   showVaral = false,
   connectedLeft = false,
   connectedRight = false,
-  boxColor = "#E0E0E0",
+  boxColor = DEFAULT_BOX_COLOR,
   selectedColors = null,
   boxColors = null,
   wireframe = false,
@@ -79,26 +63,20 @@ export default function BoxModel({
 
   // Semente única calculada para este modelo específico
   const seedBase = useMemo(() => {
-    if (typeof colorSeed === "number" && !isNaN(colorSeed)) {
-      return Math.floor(colorSeed * 1000000) + 1;
-    }
-    if (typeof seed === "number" && !isNaN(seed)) {
-      return Math.floor(seed) + 1;
-    }
-    const idToUse =
-      itemId ||
-      modelId ||
-      (Array.isArray(position) ? position.join(",") : null);
-    if (idToUse) {
-      return hashString(String(idToUse));
-    }
-    return instanceSeed;
+    return resolveSeedBase({
+      colorSeed,
+      seed,
+      itemId,
+      modelId,
+      position,
+      fallbackSeed: instanceSeed,
+    });
   }, [colorSeed, seed, itemId, modelId, position, instanceSeed]);
 
-  // Materiais das caixas por andar (tier), preservando as cores bases exatas com variações suaves e sutis por modelo
+  // Materiais das caixas por andar (tier), compartilhando exatamente as mesmas regras de tonalidade e HSL
   const tierMaterials = useMemo(() => {
     return Array.from({ length: safeCount }).map((_, tierIdx) => {
-      let hex = "#E0E0E0";
+      let hex = DEFAULT_BOX_COLOR;
       if (Array.isArray(boxColors) && boxColors[tierIdx]) {
         hex = boxColors[tierIdx];
       } else if (Array.isArray(selectedColors) && selectedColors.length > 0) {
@@ -107,55 +85,7 @@ export default function BoxModel({
         hex = boxColor;
       }
 
-      const baseColor = new THREE.Color(hex);
-      const hsl = { h: 0, s: 0, l: 0 };
-      baseColor.getHSL(hsl);
-
-      // Limite calibrado de escurecimento por cor:
-      // Reduz significativamente a grande diferença de tonalidade para Verde (#009F5A),
-      // Amarelo (#DAB900) e Azul (#4C75B7), evitando caixas excessivamente escuras ou desbotadas.
-      const upperHex = String(hex).trim().toUpperCase();
-      let maxEscurecimento = 0.026;
-
-      if (upperHex.includes("009F5A")) {
-        // Verde: já possui L baixo (~0.31). Variação sutil (~2.0%) evita tons pretos/musgo
-        maxEscurecimento = 0.020;
-      } else if (upperHex.includes("DAB900")) {
-        // Amarelo: variação sutil (~2.2%) evita tons mostarda/oliva escuros
-        maxEscurecimento = 0.022;
-      } else if (upperHex.includes("4C75B7")) {
-        // Azul: variação suave (~2.6%) evita azul-marinho excessivo
-        maxEscurecimento = 0.026;
-      } else if (upperHex.includes("B65241")) {
-        // Vermelho
-        maxEscurecimento = 0.026;
-      } else if (upperHex.includes("E0E0E0")) {
-        // Branco
-        maxEscurecimento = 0.1;
-      } else if (upperHex.includes("676767")) {
-        // Cinza
-        maxEscurecimento = 0.028;
-      } else {
-        maxEscurecimento = Math.min(0.028, Math.max(0.015, hsl.l * 0.06));
-      }
-
-      // Gerador pseudo-aleatório determinístico único para este modelo + andar
-      const tierSeed = seedBase * 1009 + (tierIdx + 1) * 6271 + 4057;
-      const rand = pseudoRandom(tierSeed); // [0, 1]
-
-      // Variação suave tendendo a levemente mais escura mantendo estritamente Hue e Saturation
-      const darkFactor = rand * maxEscurecimento;
-      const newL = Math.max(0.10, hsl.l - darkFactor);
-
-      const col = new THREE.Color();
-      col.setHSL(hsl.h, hsl.s, newL);
-
-      return new THREE.MeshStandardMaterial({
-        color: col,
-        roughness: 0.65,
-        metalness: 0.05,
-        wireframe,
-      });
+      return createBoxMaterial(hex, seedBase, tierIdx, wireframe);
     });
   }, [safeCount, boxColors, selectedColors, boxColor, wireframe, seedBase]);
 

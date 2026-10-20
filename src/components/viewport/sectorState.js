@@ -135,7 +135,7 @@ export function useSectorState() {
         case "pallet":
           newItem.name = "Pallet Madeira";
           newItem.position = [0, 0, 0];
-          newItem.props = { width: 1.2, depth: 1.0, height: 0.14 };
+          newItem.props = { boxCount: 0 };
           break;
         case "cargo_red":
           newItem.name = "Carga Vermelha";

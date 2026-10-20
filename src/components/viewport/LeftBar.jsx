@@ -31,11 +31,6 @@ const CATALOG_ITEMS = [
     icon: "lucide:brick-wall",
   },
   {
-    type: "bar",
-    name: "Barra",
-    icon: "lucide:square",
-  },
-  {
     type: "cube",
     name: "Cubo",
     icon: "lucide:box",

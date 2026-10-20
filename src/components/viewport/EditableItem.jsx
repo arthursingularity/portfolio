@@ -32,16 +32,62 @@ export default function EditableItem({
   axisLock = null,
   isModalGrab = false,
   snapToGrid = true,
-  gridSnapSize = 0.05,
+  gridSnapSize = 0.025,
   orbitControlsRef,
   hideGizmo = false,
   justFinishedBoxDragRef,
+  isTransforming = false,
+  isTransformingRef = null,
+  justFinishedTransformRef = null,
+  onTransformStart,
+  onTransformEnd,
 }) {
   // Use state for target mesh so TransformControls re-renders immediately on mount
   const [target, setTarget] = useState(null);
   const [localHovered, setLocalHovered] = useState(false);
-  const isHovered = isHoveredProp !== undefined ? isHoveredProp : localHovered;
   const transformRef = useRef(null);
+
+  const isHoverBlocked =
+    Boolean(isTransforming) ||
+    Boolean(isTransformingRef?.current) ||
+    Boolean(justFinishedTransformRef?.current) ||
+    Boolean(isModalGrab);
+
+  const isHovered = !isHoverBlocked
+    ? isHoveredProp !== undefined
+      ? isHoveredProp
+      : localHovered
+    : false;
+
+  useEffect(() => {
+    if (isHoverBlocked) {
+      setLocalHovered(false);
+    }
+  }, [isHoverBlocked]);
+
+  const callbacksRef = useRef({
+    onTransformStart,
+    onTransformEnd,
+    onUpdateTransform,
+    onUpdateTransforms,
+    onSelect,
+  });
+
+  useEffect(() => {
+    callbacksRef.current = {
+      onTransformStart,
+      onTransformEnd,
+      onUpdateTransform,
+      onUpdateTransforms,
+      onSelect,
+    };
+  }, [
+    onTransformStart,
+    onTransformEnd,
+    onUpdateTransform,
+    onUpdateTransforms,
+    onSelect,
+  ]);
 
   const setTargetCallback = useCallback(
     (node) => {
@@ -150,7 +196,17 @@ export default function EditableItem({
         orbitControlsRef.current.enabled = !event.value;
       }
       if (event.value) {
-        // Drag START: Capture snapshot of positions and rotations of all selected items
+        // Drag START: Trigger transform start and suppress hover across all models
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = false;
+        }
+        if (isTransformingRef) {
+          isTransformingRef.current = true;
+        }
+        callbacksRef.current.onTransformStart?.(item.id);
+        setLocalHovered(false);
+
+        // Capture snapshot of positions and rotations of all selected items
         if (target) {
           dragStartData.startPos = target.position.clone();
           dragStartData.startRot = target.rotation.clone();
@@ -187,6 +243,10 @@ export default function EditableItem({
         }
       } else {
         // Drag END: Save final positions and rotations of all selected items
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
+
         if (target && dragStartData.startPos) {
           const deltaPos = target.position.clone().sub(dragStartData.startPos);
           const deltaRotY = target.rotation.y - dragStartData.startRot.y;
@@ -195,14 +255,14 @@ export default function EditableItem({
             {
               id: item.id,
               position: [
-                Math.round(target.position.x * 100) / 100,
-                Math.round(target.position.y * 100) / 100,
-                Math.round(target.position.z * 100) / 100,
+                Math.round(target.position.x * 10000) / 10000,
+                Math.round(target.position.y * 10000) / 10000,
+                Math.round(target.position.z * 10000) / 10000,
               ],
               rotation: [
-                Math.round(target.rotation.x * 100) / 100,
-                Math.round(target.rotation.y * 100) / 100,
-                Math.round(target.rotation.z * 100) / 100,
+                Math.round(target.rotation.x * 10000) / 10000,
+                Math.round(target.rotation.y * 10000) / 10000,
+                Math.round(target.rotation.z * 10000) / 10000,
               ],
             },
           ];
@@ -254,6 +314,9 @@ export default function EditableItem({
           dragStartData.startPos = null;
           dragStartData.others = [];
         }
+
+        // Always notify transform end so selection stays strictly locked on the transformed item
+        callbacksRef.current.onTransformEnd?.(item.id);
       }
     };
 
@@ -313,7 +376,14 @@ export default function EditableItem({
   const renderModel = () => {
     switch (item.type) {
       case "pallet":
-        return <PalletModel {...item.props} />;
+        return (
+          <PalletModel
+            {...item.props}
+            itemId={item.id}
+            modelId={item.id}
+            position={item.position}
+          />
+        );
       case "floor":
         return (
           <FloorModel
@@ -361,11 +431,26 @@ export default function EditableItem({
           ) {
             document.activeElement.blur();
           }
-          if (justFinishedBoxDragRef?.current) return;
+          if (
+            justFinishedTransformRef?.current ||
+            isTransformingRef?.current ||
+            isTransforming ||
+            justFinishedBoxDragRef?.current ||
+            isModalGrab
+          ) {
+            e.stopPropagation();
+            return;
+          }
           e.stopPropagation();
           onSelect(item.id, e.shiftKey || e.ctrlKey || e.metaKey);
         }}
         onPointerOver={(e) => {
+          if (
+            isHoverBlocked ||
+            justFinishedBoxDragRef?.current
+          ) {
+            return;
+          }
           if (!item.props?.markingMode) {
             e.stopPropagation();
             onPointerOverItem?.(item.id);
@@ -374,6 +459,13 @@ export default function EditableItem({
           }
         }}
         onPointerOut={() => {
+          if (
+            isHoverBlocked ||
+            justFinishedBoxDragRef?.current
+          ) {
+            setLocalHovered(false);
+            return;
+          }
           if (!item.props?.markingMode) {
             onPointerOutItem?.(item.id);
             setLocalHovered(false);
@@ -393,13 +485,13 @@ export default function EditableItem({
         )}
       </group>
 
-      {/* 3D Transform Gizmo for primary active item - mounts immediately when selected, hides during marking mode, select mode, size mode, axis lock, or modal grab */}
-      {isSelected && isPrimarySelected && target && !hideGizmo && !item.props?.markingMode && transformMode !== "select" && transformMode !== "size" && !axisLock && !isModalGrab && (
+      {/* 3D Transform Gizmo for primary active item - mounts immediately when selected, hides during marking mode, select mode, size mode, or modal grab */}
+      {isSelected && isPrimarySelected && target && !hideGizmo && !item.props?.markingMode && transformMode !== "select" && transformMode !== "size" && !isModalGrab && (
         <TransformControls
           ref={setTransformRef}
           object={target}
           mode={transformMode}
-          translationSnap={snapToGrid ? (gridSnapSize || 0.05) : null}
+          translationSnap={snapToGrid ? (gridSnapSize || 0.025) : null}
           rotationSnap={snapToGrid ? 0.05 : null}
           size={0.85}
           showX={!axisLock || axisLock === "x"}

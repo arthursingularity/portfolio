@@ -4,14 +4,7 @@ import React, { useState, useEffect } from "react";
 import { Icon } from "@iconify/react";
 import ColorPicker from "./ColorPicker";
 
-const BOX_PALETTE_COLORS = [
-  { id: "branco", name: "Branco", hex: "#E0E0E0", border: "#B0B0B0" },
-  { id: "azul", name: "Azul", hex: "#4C75B7", border: "#3B5F9E" },
-  { id: "verde", name: "Verde", hex: "#009F5A", border: "#007A44" },
-  { id: "vermelho", name: "Vermelho", hex: "#B65241", border: "#9A4132" },
-  { id: "cinza", name: "Cinza", hex: "#676767", border: "#525252" },
-  { id: "amarelo", name: "Amarelo", hex: "#DAB900", border: "#B89D00" },
-];
+import { BOX_PALETTE_COLORS, DEFAULT_BOX_COLOR } from "./models/boxConfig";
 
 export default function ModelProperties({
   item,
@@ -67,6 +60,176 @@ export default function ModelProperties({
 
       <div className="p-3 flex-1 min-h-0 flex flex-col gap-3 text-xs overflow-y-auto">
         {/* Specific Object Customization */}
+        {/* ─── Propriedades do Pallet ─── */}
+        {item.type === "pallet" && (() => {
+          const currentBoxes =
+            item.props?.boxCount !== undefined && item.props?.boxCount !== ""
+              ? item.props.boxCount
+              : 0;
+          const numBoxes = Math.min(30, Math.max(0, parseInt(currentBoxes, 10) || 0));
+          const layers = Math.ceil(numBoxes / 5);
+
+          const handleBoxCountChange = (val) => {
+            if (val === "") {
+              onUpdateProps(item.id, { boxCount: "" });
+              return;
+            }
+            const num = parseInt(val, 10);
+            if (!isNaN(num)) {
+              onUpdateProps(item.id, {
+                boxCount: Math.min(30, Math.max(0, num)),
+              });
+            }
+          };
+
+          const currentBoxColor = item.props?.boxColor || DEFAULT_BOX_COLOR;
+          const selectedColorDef = BOX_PALETTE_COLORS.find(
+            (c) => c.hex.toUpperCase() === currentBoxColor.toUpperCase()
+          );
+
+          return (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-neutral-400 font-medium">
+                    Caixas no Pallet
+                  </span>
+                  <span className="text-[11px] font-mono text-neutral-400 tabular-nums">
+                    {numBoxes === 0
+                      ? "Vazio (0 caixas)"
+                      : `${numBoxes} un • ${layers} ${layers === 1 ? "camada" : "camadas"}`}
+                  </span>
+                </div>
+
+                {/* Campo Numérico com Botões - e + */}
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={numBoxes <= 0}
+                    onClick={() => handleBoxCountChange(Math.max(0, numBoxes - 1))}
+                    className="w-7 h-[28px] flex items-center justify-center bg-[#121214] border border-white/[0.08] hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed rounded text-white/80 hover:text-white  cursor-pointer shrink-0"
+                    title="Diminuir 1 caixa"
+                  >
+                    <Icon icon="lucide:minus" className="text-xs" />
+                  </button>
+
+                  <div className="flex-1 flex items-center bg-[#121214] border border-white/[0.08] focus-within:border-white/25 rounded px-2 h-[28px]">
+                    <input
+                      type="number"
+                      min="0"
+                      max="30"
+                      step="1"
+                      value={currentBoxes}
+                      onChange={(e) => handleBoxCountChange(e.target.value)}
+                      onBlur={() => {
+                        const parsed = parseInt(item.props?.boxCount, 10);
+                        onUpdateProps(item.id, {
+                          boxCount: isNaN(parsed) ? 0 : Math.min(30, Math.max(0, parsed)),
+                        });
+                      }}
+                      placeholder="0"
+                      className="w-full bg-transparent text-white outline-none font-mono text-xs text-center [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    />
+                    <span className="text-[10px] text-neutral-500 font-mono ml-1 shrink-0">
+                      cx
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={numBoxes >= 30}
+                    onClick={() => handleBoxCountChange(Math.min(30, numBoxes + 1))}
+                    className="w-7 h-[28px] flex items-center justify-center bg-[#121214] border border-white/[0.08] hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed rounded text-white/80 hover:text-white  cursor-pointer shrink-0"
+                    title="Aumentar 1 caixa"
+                  >
+                    <Icon icon="lucide:plus" className="text-xs" />
+                  </button>
+                </div>
+
+                {/* Slider visual de 0 a 30 */}
+                <div className="flex items-center gap-2 pt-0.5">
+                  <input
+                    type="range"
+                    min="0"
+                    max="30"
+                    step="1"
+                    value={numBoxes}
+                    onChange={(e) => handleBoxCountChange(e.target.value)}
+                    className="w-full h-1 bg-neutral-800 rounded-lg appearance-none cursor-pointer accent-white"
+                  />
+                </div>
+
+                {/* Presets Rápidos por Nível / Camada */}
+                <div className="flex flex-col gap-1 pt-1">
+                  <span className="text-[10px] text-neutral-500 font-mono">
+                    Atalhos por Camada (5 caixas / nível):
+                  </span>
+                  <div className="grid grid-cols-7 gap-1">
+                    {[0, 5, 10, 15, 20, 25, 30].map((preset) => {
+                      const isActive = numBoxes === preset;
+                      return (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => handleBoxCountChange(preset)}
+                          className={`py-1 rounded border text-[11px] font-mono tabular-nums  cursor-pointer ${
+                            isActive
+                              ? "bg-white border-white text-black font-semibold shadow-sm"
+                              : "bg-[#121214] border-white/[0.08] text-white/60 hover:text-white hover:border-white/25"
+                          }`}
+                          title={`${preset} caixas (${preset / 5} ${preset / 5 === 1 ? "camada" : "camadas"})`}
+                        >
+                          {preset}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Linha divisória */}
+              <div className="h-[1px] w-auto bg-neutral-700/70 my-0.5" />
+
+              {/* ─── Cor das Caixas do Pallet ─── */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] text-neutral-400 font-medium">
+                    Cor das Caixas
+                  </span>
+                  <span className="text-[11px] font-mono text-neutral-400 tabular-nums uppercase">
+                    {selectedColorDef ? selectedColorDef.name : currentBoxColor}
+                  </span>
+                </div>
+
+                {/* Presets Rápidos de Cores das Caixas */}
+                <div className="grid grid-cols-6 gap-1.5">
+                  {BOX_PALETTE_COLORS.map((c) => {
+                    const isSelected =
+                      currentBoxColor.toUpperCase() === c.hex.toUpperCase();
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        title={`${c.name} (${c.hex})`}
+                        onClick={() =>
+                          onUpdateProps(item.id, { boxColor: c.hex })
+                        }
+                        className={`h-7 rounded border  cursor-pointer flex items-center justify-center relative ${
+                          isSelected
+                            ? "border-white ring-1 ring-white scale-[1.03]"
+                            : "border-white/10 hover:border-white/40 opacity-80 hover:opacity-100"
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                      >
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ─── Propriedades da Parede ─── */}
         {item.type === "wall" && (
           <div className="flex flex-col gap-3">
@@ -245,7 +408,7 @@ export default function ModelProperties({
                             height: preset.h,
                           })
                         }
-                        className={`py-1 px-1 rounded border text-[10px] font-mono transition-colors ${
+                        className={`py-1 px-1 rounded border text-[10px] font-mono ${
                           isMatch
                             ? "bg-white text-black border-white font-semibold"
                             : "border-white/10 text-white/70 hover:bg-white/10"
@@ -432,7 +595,7 @@ export default function ModelProperties({
                             depth: preset.d,
                           })
                         }
-                        className={`py-1 px-1 rounded border text-[10px] font-mono transition-colors ${
+                        className={`py-1 px-1 rounded border text-[10px] font-mono  ${
                           isMatch
                             ? "bg-white text-black border-white font-semibold"
                             : "border-white/10 text-white/70 hover:bg-white/10"
@@ -1236,7 +1399,7 @@ export default function ModelProperties({
                 <button
                   type="button"
                   onClick={() => onSeparateItem(item.id)}
-                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/25 text-white/90 text-xs transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md bg-white/[0.06] hover:bg-white/[0.12] border border-white/[0.12] hover:border-white/25 text-white/90 text-xs  cursor-pointer"
                   title="Separar novamente os modelos individuais"
                 >
                   <Icon icon="iconoven:blend-mode" className="text-sm text-primary-400" />

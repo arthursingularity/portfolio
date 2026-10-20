@@ -142,13 +142,8 @@ export default function SectorStudio() {
   const handleSetTransformMode = useCallback(
     (mode) => {
       setTransformMode(mode);
-      if (mode === "translate") {
-        setIsModalGrab(true);
-        setAxisLock(null);
-      } else {
-        setIsModalGrab(false);
-        setAxisLock(null);
-      }
+      setIsModalGrab(false);
+      setAxisLock(null);
     },
     [setTransformMode]
   );
@@ -210,14 +205,17 @@ export default function SectorStudio() {
         setTransformMode("select");
         setIsModalGrab(false);
         setAxisLock(null);
-      } else if (
-        e.key === "g" ||
-        e.key === "G" ||
-        e.key === "t" ||
-        e.key === "T"
-      ) {
+      } else if (e.key === "g" || e.key === "G") {
+        const hasSelection = (selectedIds && selectedIds.length > 0) || selectedId;
+        if (hasSelection) {
+          e.preventDefault();
+          setTransformMode("translate");
+          setIsModalGrab(false);
+          setAxisLock(null);
+        }
+      } else if (e.key === "t" || e.key === "T") {
         setTransformMode("translate");
-        setIsModalGrab(true);
+        setIsModalGrab(false);
         setAxisLock(null);
       } else if (e.key === "r" || e.key === "R") {
         setTransformMode("rotate");
@@ -251,10 +249,14 @@ export default function SectorStudio() {
         !e.metaKey &&
         !e.shiftKey
       ) {
-        if ((transformMode === "translate" || isModalGrab) && (selectedIds.length > 0 || selectedId)) {
+        const hasSelection = (selectedIds && selectedIds.length > 0) || selectedId;
+        if (hasSelection && (transformMode === "translate" || isModalGrab)) {
           e.preventDefault();
-          setIsModalGrab(true);
-          setAxisLock((cur) => (cur === "x" ? null : "x"));
+          if (!isModalGrab) {
+            setTransformMode("translate");
+            setIsModalGrab(true);
+            setAxisLock("x");
+          }
         }
       } else if (
         (e.key === "y" || e.key === "Y") &&
@@ -262,10 +264,14 @@ export default function SectorStudio() {
         !e.metaKey &&
         !e.shiftKey
       ) {
-        if ((transformMode === "translate" || isModalGrab) && (selectedIds.length > 0 || selectedId)) {
+        const hasSelection = (selectedIds && selectedIds.length > 0) || selectedId;
+        if (hasSelection && (transformMode === "translate" || isModalGrab)) {
           e.preventDefault();
-          setIsModalGrab(true);
-          setAxisLock((cur) => (cur === "y" ? null : "y"));
+          if (!isModalGrab) {
+            setTransformMode("translate");
+            setIsModalGrab(true);
+            setAxisLock("y");
+          }
         }
       } else if (
         (e.key === "z" || e.key === "Z") &&
@@ -273,10 +279,14 @@ export default function SectorStudio() {
         !e.metaKey &&
         !e.shiftKey
       ) {
-        if ((transformMode === "translate" || isModalGrab) && (selectedIds.length > 0 || selectedId)) {
+        const hasSelection = (selectedIds && selectedIds.length > 0) || selectedId;
+        if (hasSelection && (transformMode === "translate" || isModalGrab)) {
           e.preventDefault();
-          setIsModalGrab(true);
-          setAxisLock((cur) => (cur === "z" ? null : "z"));
+          if (!isModalGrab) {
+            setTransformMode("translate");
+            setIsModalGrab(true);
+            setAxisLock("z");
+          }
         }
       } else if (
         (e.key === "ArrowUp" ||
@@ -287,7 +297,7 @@ export default function SectorStudio() {
         (selectedIds.length > 0 || selectedId)
       ) {
         e.preventDefault();
-        const step = 0.05;
+        const step = 0.025;
         let deltaX = 0;
         let deltaY = 0; // vertical height in Three.js (Blender Z)
         let deltaZ = 0; // depth in Three.js (Blender Y)
@@ -317,9 +327,9 @@ export default function SectorStudio() {
           const updates = activeTargets.map((it) => ({
             id: it.id,
             position: [
-              Math.round(((it.position?.[0] || 0) + deltaX) * 1000) / 1000,
-              Math.round(((it.position?.[1] || 0) + deltaY) * 1000) / 1000,
-              Math.round(((it.position?.[2] || 0) + deltaZ) * 1000) / 1000,
+              Math.round(((it.position?.[0] || 0) + deltaX) * 10000) / 10000,
+              Math.round(((it.position?.[1] || 0) + deltaY) * 10000) / 10000,
+              Math.round(((it.position?.[2] || 0) + deltaZ) * 10000) / 10000,
             ],
           }));
           updateTransforms(updates);
@@ -327,9 +337,9 @@ export default function SectorStudio() {
           const it = activeTargets[0];
           updateTransform(it.id, {
             position: [
-              Math.round(((it.position?.[0] || 0) + deltaX) * 1000) / 1000,
-              Math.round(((it.position?.[1] || 0) + deltaY) * 1000) / 1000,
-              Math.round(((it.position?.[2] || 0) + deltaZ) * 1000) / 1000,
+              Math.round(((it.position?.[0] || 0) + deltaX) * 10000) / 10000,
+              Math.round(((it.position?.[1] || 0) + deltaY) * 10000) / 10000,
+              Math.round(((it.position?.[2] || 0) + deltaZ) * 10000) / 10000,
             ],
           });
         }

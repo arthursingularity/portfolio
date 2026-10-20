@@ -29,7 +29,9 @@ export default function BlenderGrabModal({
   axisLock = null,
   setAxisLock = () => {},
   snapToGrid = false,
-  gridSnapSize = 0.05,
+  gridSnapSize = 0.025,
+  justFinishedTransformRef = null,
+  onTransformStart,
   onFinishGrab = () => {},
   onGrabInfoChange = () => {},
 }) {
@@ -38,6 +40,7 @@ export default function BlenderGrabModal({
   const stateRef = useRef({
     isGrabbing: false,
     axisLock: null,
+    axisSpace: "none", // 'global' | 'local' | 'none'
     pivot3D: new THREE.Vector3(),
     centerScreen: { x: 0, y: 0 },
     initialData: {},
@@ -52,6 +55,7 @@ export default function BlenderGrabModal({
     onUpdateTransform,
     onUpdateTransforms,
     setAxisLock,
+    onTransformStart,
     onFinishGrab,
     onGrabInfoChange,
   });
@@ -61,6 +65,7 @@ export default function BlenderGrabModal({
       onUpdateTransform,
       onUpdateTransforms,
       setAxisLock,
+      onTransformStart,
       onFinishGrab,
       onGrabInfoChange,
     };
@@ -68,6 +73,7 @@ export default function BlenderGrabModal({
     onUpdateTransform,
     onUpdateTransforms,
     setAxisLock,
+    onTransformStart,
     onFinishGrab,
     onGrabInfoChange,
   ]);
@@ -76,6 +82,7 @@ export default function BlenderGrabModal({
   useEffect(() => {
     if (stateRef.current.isGrabbing && axisLock !== undefined) {
       stateRef.current.axisLock = axisLock;
+      stateRef.current.axisSpace = axisLock ? "global" : "none";
       stateRef.current.initialAxisParam = null; // recalcula referência para não saltar
     }
   }, [axisLock]);
@@ -89,10 +96,11 @@ export default function BlenderGrabModal({
         ? [selectedItem]
         : [];
 
-    if (!isGrabActive || rawTargets.length === 0) {
+    if (!isGrabActive || !axisLock || rawTargets.length === 0) {
       if (stateRef.current.isGrabbing) {
         stateRef.current.isGrabbing = false;
         stateRef.current.axisLock = null;
+        stateRef.current.axisSpace = "none";
         if (orbitControlsRef?.current) {
           orbitControlsRef.current.enabled = true;
         }
@@ -120,6 +128,7 @@ export default function BlenderGrabModal({
     stateRef.current.activeTargets = rawTargets;
     stateRef.current.isGrabbing = true;
     stateRef.current.axisLock = axisLock || null;
+    stateRef.current.axisSpace = axisLock ? "global" : "none";
     stateRef.current.currentDelta = new THREE.Vector3(0, 0, 0);
     stateRef.current.initialMouse = null;
     stateRef.current.initialPlaneIntersect = null;
@@ -139,8 +148,12 @@ export default function BlenderGrabModal({
     }
     document.body.style.cursor = "move";
 
+    callbacksRef.current.onTransformStart?.(rawTargets[0]?.id);
+
     callbacksRef.current.onGrabInfoChange?.({
       axisLock: axisLock || null,
+      axisSpace: axisLock ? "global" : "none",
+      axisVector: null,
       deltaVector: new THREE.Vector3(0, 0, 0),
       deltaAmount: 0,
       mousePos: { x: centerScreenX, y: centerScreenY },
@@ -158,14 +171,77 @@ export default function BlenderGrabModal({
     targetRegistryRef,
   ]);
 
-  // Função auxiliar para obter vetor 3D do eixo
-  const getAxisVector = (axis) => {
+  // Função auxiliar para obter vetor 3D do eixo (Global ou Local)
+  const getAxisVector = (axis, space = "global", primaryNode = null) => {
+    if (!axis) return null;
+
+    if (space === "local" && primaryNode) {
+      primaryNode.updateMatrixWorld(true);
+      const mat = primaryNode.matrixWorld;
+      // Local X: Coluna 0
+      if (axis === "x") return new THREE.Vector3().setFromMatrixColumn(mat, 0).normalize();
+      // Local Y (Blender Y = Z no Three.js / Profundidade horizontal): Coluna 2
+      if (axis === "y") return new THREE.Vector3().setFromMatrixColumn(mat, 2).normalize();
+      // Local Z (Blender Z = Y no Three.js / Altura vertical): Coluna 1
+      if (axis === "z") return new THREE.Vector3().setFromMatrixColumn(mat, 1).normalize();
+    }
+
+    // Global
     if (axis === "x") return new THREE.Vector3(1, 0, 0);
     // Blender Y = Profundidade horizontal no Three.js (Z)
     if (axis === "y") return new THREE.Vector3(0, 0, 1);
     // Blender Z = Altura vertical no Three.js (Y)
     if (axis === "z") return new THREE.Vector3(0, 1, 0);
     return null;
+  };
+
+  // Alterna restrição de eixo: Global -> Local -> Nenhum (Livre)
+  const cycleAxisLock = (axisKey) => {
+    const s = stateRef.current;
+    if (!s.isGrabbing) return;
+
+    let nextAxis = axisKey;
+    let nextSpace = "global";
+
+    if (s.axisLock !== axisKey) {
+      // 1º toque no eixo: Eixo Global
+      nextAxis = axisKey;
+      nextSpace = "global";
+    } else {
+      // Mesma tecla pressionada novamente (toggle cíclico)
+      if (s.axisSpace === "global") {
+        // 2º toque: Eixo Local
+        nextAxis = axisKey;
+        nextSpace = "local";
+      } else if (s.axisSpace === "local") {
+        // 3º toque: encerra o modal grab e retorna às setinhas de orientação
+        confirmGrab();
+        return;
+      } else {
+        nextAxis = axisKey;
+        nextSpace = "global";
+      }
+    }
+
+    s.axisLock = nextAxis;
+    s.axisSpace = nextSpace;
+    s.initialAxisParam = null; // Reseta referência para não saltar
+
+    const primaryTarget = s.activeTargets[0];
+    const targetNode = primaryTarget ? targetRegistryRef?.current?.[primaryTarget.id] : null;
+    const axisVec = getAxisVector(nextAxis, nextSpace, targetNode);
+
+    callbacksRef.current.setAxisLock?.(nextAxis);
+    callbacksRef.current.onGrabInfoChange?.({
+      axisLock: nextAxis,
+      axisSpace: nextSpace,
+      axisVector: axisVec,
+      deltaVector: s.currentDelta,
+      deltaAmount: 0,
+      mousePos: s.centerScreen,
+      centerPos: s.centerScreen,
+      pivot3D: s.pivot3D,
+    });
   };
 
   // Confirmar movimento
@@ -196,14 +272,21 @@ export default function BlenderGrabModal({
       });
     }
 
+    if (justFinishedTransformRef) {
+      justFinishedTransformRef.current = true;
+    }
+
     if (orbitControlsRef?.current) {
       orbitControlsRef.current.enabled = true;
     }
     document.body.style.cursor = "default";
+    const finishedId = s.activeTargets[0]?.id;
     s.isGrabbing = false;
+    s.axisLock = null;
+    s.axisSpace = "none";
     callbacksRef.current.onGrabInfoChange?.(null);
     callbacksRef.current.setAxisLock?.(null);
-    callbacksRef.current.onFinishGrab?.();
+    callbacksRef.current.onFinishGrab?.(finishedId);
   };
 
   // Cancelar movimento e restaurar posições originais
@@ -211,11 +294,16 @@ export default function BlenderGrabModal({
     const s = stateRef.current;
     if (!s.isGrabbing) return;
 
+    if (justFinishedTransformRef) {
+      justFinishedTransformRef.current = true;
+    }
+
     s.activeTargets.forEach((it) => {
       const node = targetRegistryRef?.current?.[it.id];
       const init = s.initialData[it.id];
       if (node && init) {
         node.position.copy(init);
+        node.updateMatrixWorld(true);
       }
     });
 
@@ -223,10 +311,13 @@ export default function BlenderGrabModal({
       orbitControlsRef.current.enabled = true;
     }
     document.body.style.cursor = "default";
+    const finishedId = s.activeTargets[0]?.id;
     s.isGrabbing = false;
+    s.axisLock = null;
+    s.axisSpace = "none";
     callbacksRef.current.onGrabInfoChange?.(null);
     callbacksRef.current.setAxisLock?.(null);
-    callbacksRef.current.onFinishGrab?.();
+    callbacksRef.current.onFinishGrab?.(finishedId);
   };
 
   // Event Listeners globais de Mouse e Teclado
@@ -260,10 +351,13 @@ export default function BlenderGrabModal({
       }
 
       let deltaVector = new THREE.Vector3();
-      const axisVec = getAxisVector(s.axisLock);
+
+      const primaryTarget = s.activeTargets[0];
+      const targetNode = primaryTarget ? targetRegistryRef?.current?.[primaryTarget.id] : null;
+      const axisVec = getAxisVector(s.axisLock, s.axisSpace, targetNode);
 
       if (axisVec) {
-        // Cálculo geométrico do ponto mais próximo na linha do eixo 3D
+        // Cálculo geométrico do ponto mais próximo entre retas reversas (Skew Lines)
         const p1 = raycaster.ray.origin;
         const d1 = raycaster.ray.direction;
         const p2 = s.pivot3D;
@@ -280,7 +374,7 @@ export default function BlenderGrabModal({
         let sParam = 0;
 
         if (Math.abs(denom) > 1e-4) {
-          sParam = (b * d - ev) / denom;
+          sParam = (ev - b * d) / denom;
         } else {
           // Fallback se a câmera estiver olhando diretamente pelo eixo
           const projP0 = p2.clone().project(camera);
@@ -296,7 +390,10 @@ export default function BlenderGrabModal({
               e.clientX - s.initialMouse.x,
               e.clientY - s.initialMouse.y
             );
-            sParam = (mouseDelta.dot(screenDir) / len) * 2.0;
+            const distToCam = camera.position ? camera.position.distanceTo(p2) : 10;
+            const fovRad = ((camera.fov || 50) * Math.PI) / 180;
+            const worldPerPixel = (2 * distToCam * Math.tan(fovRad / 2)) / Math.max(1, rect.height);
+            sParam = mouseDelta.dot(screenDir) * worldPerPixel;
           }
         }
 
@@ -311,27 +408,15 @@ export default function BlenderGrabModal({
         }
 
         if (snapToGrid) {
-          const snap = gridSnapSize || 0.05;
+          const snap = gridSnapSize || 0.025;
           deltaS = Math.round(deltaS / snap) * snap;
         }
 
         deltaS = Math.round(deltaS * 1000) / 1000;
         deltaVector = axisVec.clone().multiplyScalar(deltaS);
       } else {
-        // Movimento livre no plano de visão da câmera
-        if (hasIntersect && s.initialPlaneIntersect) {
-          let delta = planeIntersect.clone().sub(s.initialPlaneIntersect);
-          if (e.shiftKey) {
-            delta.multiplyScalar(0.15);
-          }
-          if (snapToGrid) {
-            const snap = gridSnapSize || 0.05;
-            delta.x = Math.round(delta.x / snap) * snap;
-            delta.y = Math.round(delta.y / snap) * snap;
-            delta.z = Math.round(delta.z / snap) * snap;
-          }
-          deltaVector = delta;
-        }
+        // Movimentação livre desativada: movimento exclusivo nos eixos X, Y ou Z
+        return;
       }
 
       s.currentDelta = deltaVector;
@@ -351,13 +436,16 @@ export default function BlenderGrabModal({
 
       // Quantidade métrica de deslocamento no eixo ativo
       let deltaAmount = 0;
-      if (s.axisLock === "x") deltaAmount = deltaVector.x;
-      else if (s.axisLock === "y") deltaAmount = deltaVector.z; // Profundidade no Three.js Z
-      else if (s.axisLock === "z") deltaAmount = deltaVector.y; // Altura no Three.js Y
-      else deltaAmount = deltaVector.length();
+      if (s.axisLock && axisVec) {
+        deltaAmount = deltaVector.dot(axisVec);
+      } else {
+        deltaAmount = deltaVector.length();
+      }
 
       callbacksRef.current.onGrabInfoChange?.({
         axisLock: s.axisLock,
+        axisSpace: s.axisSpace,
+        axisVector: axisVec,
         deltaVector,
         deltaAmount,
         mousePos: { x: e.clientX, y: e.clientY },
@@ -374,11 +462,17 @@ export default function BlenderGrabModal({
         // Clique esquerdo: confirma
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         confirmGrab();
       } else if (e.button === 2) {
-        // Clique direito: cancela
+        // Clique direito: cancela e restaura posição original
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         cancelGrab();
       }
     };
@@ -398,48 +492,15 @@ export default function BlenderGrabModal({
       if (e.key === "x" || e.key === "X") {
         e.preventDefault();
         e.stopPropagation();
-        const next = s.axisLock === "x" ? null : "x";
-        s.axisLock = next;
-        s.initialAxisParam = null;
-        callbacksRef.current.setAxisLock?.(next);
-        callbacksRef.current.onGrabInfoChange?.({
-          axisLock: next,
-          deltaVector: s.currentDelta,
-          deltaAmount: 0,
-          mousePos: s.centerScreen,
-          centerPos: s.centerScreen,
-          pivot3D: s.pivot3D,
-        });
+        cycleAxisLock("x");
       } else if (e.key === "y" || e.key === "Y") {
         e.preventDefault();
         e.stopPropagation();
-        const next = s.axisLock === "y" ? null : "y";
-        s.axisLock = next;
-        s.initialAxisParam = null;
-        callbacksRef.current.setAxisLock?.(next);
-        callbacksRef.current.onGrabInfoChange?.({
-          axisLock: next,
-          deltaVector: s.currentDelta,
-          deltaAmount: 0,
-          mousePos: s.centerScreen,
-          centerPos: s.centerScreen,
-          pivot3D: s.pivot3D,
-        });
+        cycleAxisLock("y");
       } else if (e.key === "z" || e.key === "Z") {
         e.preventDefault();
         e.stopPropagation();
-        const next = s.axisLock === "z" ? null : "z";
-        s.axisLock = next;
-        s.initialAxisParam = null;
-        callbacksRef.current.setAxisLock?.(next);
-        callbacksRef.current.onGrabInfoChange?.({
-          axisLock: next,
-          deltaVector: s.currentDelta,
-          deltaAmount: 0,
-          mousePos: s.centerScreen,
-          centerPos: s.centerScreen,
-          pivot3D: s.pivot3D,
-        });
+        cycleAxisLock("z");
       } else if (
         e.key === "Enter" ||
         e.key === " " ||
@@ -448,22 +509,37 @@ export default function BlenderGrabModal({
       ) {
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         confirmGrab();
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         cancelGrab();
+      }
+    };
+
+    const handleContextMenu = (e) => {
+      if (stateRef.current.isGrabbing) {
+        e.preventDefault();
+        e.stopPropagation();
       }
     };
 
     window.addEventListener("pointermove", handlePointerMove);
     window.addEventListener("pointerdown", handlePointerDown, true);
     window.addEventListener("keydown", handleKeyDown, true);
+    window.addEventListener("contextmenu", handleContextMenu, true);
 
     return () => {
       window.removeEventListener("pointermove", handlePointerMove);
       window.removeEventListener("pointerdown", handlePointerDown, true);
       window.removeEventListener("keydown", handleKeyDown, true);
+      window.removeEventListener("contextmenu", handleContextMenu, true);
     };
   }, [camera, gl, snapToGrid, gridSnapSize]);
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import * as THREE from "three";
 import { Canvas, useThree } from "@react-three/fiber";
 import { OrbitControls, GizmoHelper, GizmoViewport } from "@react-three/drei";
@@ -143,6 +143,11 @@ export default function SceneCanvas({
   const dragStateRef = useRef(null);
   const justFinishedBoxDragRef = useRef(false);
 
+  // Global transform locks to prevent hover or selection theft when moving / rotating
+  const isTransformingRef = useRef(false);
+  const [isTransforming, setIsTransforming] = useState(false);
+  const justFinishedTransformRef = useRef(false);
+
   const [selectionRect, setSelectionRect] = useState(null);
   const [hoveredId, setHoveredId] = useState(null);
   const [scaleInfo, setScaleInfo] = useState(null);
@@ -161,6 +166,46 @@ export default function SceneCanvas({
       : selectedItem
         ? [selectedItem]
         : [];
+
+  const isGrabTransforming = Boolean(isModalGrab && axisLock);
+  const isScaleTransforming = Boolean(transformMode === "size");
+  const isCurrentlyTransforming =
+    isTransforming || isGrabTransforming || isScaleTransforming;
+
+  useEffect(() => {
+    if (isCurrentlyTransforming) {
+      setHoveredId(null);
+    }
+  }, [isCurrentlyTransforming]);
+
+  const handleTransformStart = useCallback((id) => {
+    isTransformingRef.current = true;
+    setIsTransforming(true);
+    setHoveredId(null);
+  }, []);
+
+  const handleTransformEnd = useCallback(
+    (id) => {
+      justFinishedTransformRef.current = true;
+      setHoveredId(null);
+
+      // Re-enforce selection strictly on the transformed model (or multi-selection)
+      const targetId = id || selectedId;
+      if (activeSelectedIds && activeSelectedIds.length > 1) {
+        setSelectedIds?.([...activeSelectedIds]);
+      } else if (targetId) {
+        onSelect?.(targetId, false);
+      }
+
+      // Swallows synthetic pointer/click events to guarantee selection and hover integrity
+      setTimeout(() => {
+        justFinishedTransformRef.current = false;
+        isTransformingRef.current = false;
+        setIsTransforming(false);
+      }, 200);
+    },
+    [activeSelectedIds, onSelect, selectedId, setSelectedIds]
+  );
 
   const isFloorMarkingActive = Boolean(
     selectedItem?.type === "floor" && selectedItem?.props?.markingMode
@@ -362,95 +407,6 @@ export default function SceneCanvas({
         </svg>
       )}
 
-      {/* Badge de Status: Mover (G - Blender) */}
-      {grabInfo && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none flex items-center gap-2.5 bg-[#18181b]/95 border border-white/15 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur text-xs font-mono text-white">
-          <span
-            className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${
-              grabInfo.axisLock === "x"
-                ? "bg-red-400"
-                : grabInfo.axisLock === "y"
-                ? "bg-green-400"
-                : grabInfo.axisLock === "z"
-                ? "bg-blue-400"
-                : "bg-amber-400"
-            }`}
-          />
-          <span className="font-semibold">
-            {grabInfo.axisLock === "x" && (
-              <span className="text-[#f87171]">
-                Mover [Eixo X - Vermelho]: {grabInfo.deltaAmount >= 0 ? "+" : ""}
-                {grabInfo.deltaAmount.toFixed(2)}m
-              </span>
-            )}
-            {grabInfo.axisLock === "y" && (
-              <span className="text-[#4ade80]">
-                Mover [Eixo Y - Verde / Profundidade]: {grabInfo.deltaAmount >= 0 ? "+" : ""}
-                {grabInfo.deltaAmount.toFixed(2)}m
-              </span>
-            )}
-            {grabInfo.axisLock === "z" && (
-              <span className="text-[#60a5fa]">
-                Mover [Eixo Z - Azul / Altura]: {grabInfo.deltaAmount >= 0 ? "+" : ""}
-                {grabInfo.deltaAmount.toFixed(2)}m
-              </span>
-            )}
-            {!grabInfo.axisLock && (
-              <span className="text-amber-300">
-                Mover [Livre]: {grabInfo.deltaAmount.toFixed(2)}m
-              </span>
-            )}
-          </span>
-          <span className="text-white/30">•</span>
-          <span className="text-white/60 text-[11px]">
-            [X, Y, Z] Travar eixo | Shift: Precisão | Clique Esq / Enter / G: Confirmar | Esc / Clique Dir: Cancelar
-          </span>
-        </div>
-      )}
-
-      {/* Badge de Status da Escala (Blender) */}
-      {scaleInfo && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 pointer-events-none select-none flex items-center gap-2.5 bg-[#18181b]/95 border border-white/15 px-4 py-1.5 rounded-full shadow-2xl backdrop-blur text-xs font-mono text-white">
-          <span
-            className={`w-2 h-2 rounded-full animate-pulse shrink-0 ${
-              scaleInfo.axisLock === "x"
-                ? "bg-red-400"
-                : scaleInfo.axisLock === "y"
-                ? "bg-green-400"
-                : scaleInfo.axisLock === "z"
-                ? "bg-blue-400"
-                : "bg-amber-400"
-            }`}
-          />
-          <span className="font-semibold">
-            {scaleInfo.axisLock === "x" && (
-              <span className="text-[#f87171]">
-                Escalar [Eixo X - Largura]: {scaleInfo.factor.toFixed(2)}x
-              </span>
-            )}
-            {scaleInfo.axisLock === "y" && (
-              <span className="text-[#4ade80]">
-                Escalar [Eixo Y - Comprimento]: {scaleInfo.factor.toFixed(2)}x
-              </span>
-            )}
-            {scaleInfo.axisLock === "z" && (
-              <span className="text-[#60a5fa]">
-                Escalar [Eixo Z - Altura]: {scaleInfo.factor.toFixed(2)}x
-              </span>
-            )}
-            {!scaleInfo.axisLock && (
-              <span className="text-amber-300">
-                Escalar [Geral]: {scaleInfo.factor.toFixed(2)}x
-              </span>
-            )}
-          </span>
-          <span className="text-white/30">•</span>
-          <span className="text-white/60 text-[11px]">
-            [X, Y, Z] Travar eixo | Shift: Precisão | Clique Esq / Enter / S: Confirmar | Esc / Clique Dir: Cancelar
-          </span>
-        </div>
-      )}
-
       <Canvas
         shadows={false}
         dpr={[1, 1.5]}
@@ -470,7 +426,14 @@ export default function SceneCanvas({
         }}
         className="w-full h-full"
         onPointerMissed={() => {
-          if (justFinishedBoxDragRef.current) return;
+          if (
+            justFinishedBoxDragRef.current ||
+            justFinishedTransformRef.current ||
+            isTransformingRef.current ||
+            isCurrentlyTransforming
+          ) {
+            return;
+          }
           if (selectedItem?.type === "floor" && selectedItem?.props?.markingMode) {
             onUpdateProps?.(selectedItem.id, { markingMode: false });
           }
@@ -519,12 +482,35 @@ export default function SceneCanvas({
               isSelected={activeSelectedIds.includes(item.id)}
               isPrimarySelected={item.id === selectedId}
               isHovered={item.id === hoveredId}
-              onPointerOverItem={(id) => setHoveredId(id)}
-              onPointerOutItem={(id) =>
-                setHoveredId((cur) => (cur === id ? null : cur))
-              }
+              onPointerOverItem={(id) => {
+                if (
+                  isCurrentlyTransforming ||
+                  isTransformingRef.current ||
+                  justFinishedTransformRef.current
+                ) {
+                  return;
+                }
+                setHoveredId(id);
+              }}
+              onPointerOutItem={(id) => {
+                if (
+                  isCurrentlyTransforming ||
+                  isTransformingRef.current ||
+                  justFinishedTransformRef.current
+                ) {
+                  return;
+                }
+                setHoveredId((cur) => (cur === id ? null : cur));
+              }}
               onSelect={(newId, isMulti) => {
-                if (justFinishedBoxDragRef.current) return;
+                if (
+                  justFinishedBoxDragRef.current ||
+                  justFinishedTransformRef.current ||
+                  isTransformingRef.current ||
+                  isCurrentlyTransforming
+                ) {
+                  return;
+                }
                 if (
                   newId !== selectedId &&
                   selectedItem?.type === "floor" &&
@@ -544,10 +530,15 @@ export default function SceneCanvas({
               axisLock={axisLock}
               isModalGrab={isModalGrab}
               snapToGrid={snapToGrid}
-              gridSnapSize={0.05}
+              gridSnapSize={0.025}
               orbitControlsRef={activeControls}
               hideGizmo={false}
               justFinishedBoxDragRef={justFinishedBoxDragRef}
+              isTransforming={isCurrentlyTransforming}
+              isTransformingRef={isTransformingRef}
+              justFinishedTransformRef={justFinishedTransformRef}
+              onTransformStart={handleTransformStart}
+              onTransformEnd={handleTransformEnd}
             />
           ))}
         </group>
@@ -561,15 +552,18 @@ export default function SceneCanvas({
           onUpdateTransforms={onUpdateTransforms}
           targetRegistryRef={targetRegistryRef}
           orbitControlsRef={activeControls}
-          isGrabActive={Boolean(isModalGrab || (transformMode === "translate" && axisLock))}
+          isGrabActive={Boolean(isModalGrab && axisLock)}
           axisLock={axisLock}
           setAxisLock={setAxisLock}
           snapToGrid={snapToGrid}
-          gridSnapSize={0.05}
-          onFinishGrab={() => {
+          gridSnapSize={0.025}
+          justFinishedTransformRef={justFinishedTransformRef}
+          onTransformStart={handleTransformStart}
+          onFinishGrab={(primaryId) => {
+            handleTransformEnd(primaryId || selectedId);
             setIsModalGrab?.(false);
             setAxisLock?.(null);
-            setTransformMode?.("select");
+            setTransformMode?.("translate");
           }}
           onGrabInfoChange={setGrabInfo}
         />
@@ -586,7 +580,10 @@ export default function SceneCanvas({
           isScaleActive={transformMode === "size"}
           axisLock={axisLock}
           setAxisLock={setAxisLock}
+          justFinishedTransformRef={justFinishedTransformRef}
+          onTransformStart={handleTransformStart}
           onFinishScale={() => {
+            handleTransformEnd(selectedId);
             setAxisLock?.(null);
             setTransformMode?.("select");
           }}
@@ -598,6 +595,8 @@ export default function SceneCanvas({
           <BlenderAxisGuide
             pivot={grabInfo.pivot3D}
             axis={grabInfo.axisLock}
+            axisVector={grabInfo.axisVector}
+            axisSpace={grabInfo.axisSpace}
           />
         )}
         {scaleInfo?.axisLock && (

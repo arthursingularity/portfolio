@@ -30,6 +30,8 @@ export default function BlenderScaleModal({
   isScaleActive = false,
   axisLock = null,
   setAxisLock = () => {},
+  justFinishedTransformRef = null,
+  onTransformStart,
   onFinishScale = () => {},
   onScaleInfoChange = () => {},
 }) {
@@ -53,6 +55,7 @@ export default function BlenderScaleModal({
     onUpdateTransforms,
     onUpdateProps,
     setAxisLock,
+    onTransformStart,
     onFinishScale,
     onScaleInfoChange,
   });
@@ -63,6 +66,7 @@ export default function BlenderScaleModal({
       onUpdateTransforms,
       onUpdateProps,
       setAxisLock,
+      onTransformStart,
       onFinishScale,
       onScaleInfoChange,
     };
@@ -71,6 +75,7 @@ export default function BlenderScaleModal({
     onUpdateTransforms,
     onUpdateProps,
     setAxisLock,
+    onTransformStart,
     onFinishScale,
     onScaleInfoChange,
   ]);
@@ -159,6 +164,8 @@ export default function BlenderScaleModal({
       orbitControlsRef.current.enabled = false;
     }
     document.body.style.cursor = "crosshair";
+
+    callbacksRef.current.onTransformStart?.(activeTargets[0]?.id);
 
     callbacksRef.current.onScaleInfoChange?.({
       factor: 1.0,
@@ -345,20 +352,29 @@ export default function BlenderScaleModal({
       });
     }
 
+    if (justFinishedTransformRef) {
+      justFinishedTransformRef.current = true;
+    }
+
     if (orbitControlsRef?.current) {
       orbitControlsRef.current.enabled = true;
     }
     document.body.style.cursor = "default";
+    const finishedId = activeTargets[0]?.id;
     stateRef.current.isScaling = false;
     callbacksRef.current.onScaleInfoChange?.(null);
     callbacksRef.current.setAxisLock?.(null);
-    callbacksRef.current.onFinishScale?.();
+    callbacksRef.current.onFinishScale?.(finishedId);
   };
 
   // Cancelar e restaurar tamanho original
   const cancelScale = () => {
     const s = stateRef.current;
     if (!s.isScaling) return;
+
+    if (justFinishedTransformRef) {
+      justFinishedTransformRef.current = true;
+    }
 
     const rawTargets =
       s.selectedItems && s.selectedItems.length > 0
@@ -381,10 +397,11 @@ export default function BlenderScaleModal({
       orbitControlsRef.current.enabled = true;
     }
     document.body.style.cursor = "default";
+    const finishedId = activeTargets[0]?.id;
     stateRef.current.isScaling = false;
     callbacksRef.current.onScaleInfoChange?.(null);
     callbacksRef.current.setAxisLock?.(null);
-    callbacksRef.current.onFinishScale?.();
+    callbacksRef.current.onFinishScale?.(finishedId);
   };
 
   // Event Listeners globais de Mouse e Teclado
@@ -435,11 +452,17 @@ export default function BlenderScaleModal({
         // Clique esquerdo: confirma
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         confirmScale();
       } else if (e.button === 2) {
         // Clique direito: cancela
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         cancelScale();
       }
     };
@@ -509,10 +532,16 @@ export default function BlenderScaleModal({
       ) {
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         confirmScale();
       } else if (e.key === "Escape") {
         e.preventDefault();
         e.stopPropagation();
+        if (justFinishedTransformRef) {
+          justFinishedTransformRef.current = true;
+        }
         cancelScale();
       }
     };

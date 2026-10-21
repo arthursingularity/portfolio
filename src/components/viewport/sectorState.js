@@ -26,11 +26,26 @@ export function useSectorState() {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) {
             // Garante que ao recarregar a página, o modo marcação sempre seja desativado
-            return parsed.map((item) =>
+            const initialList = parsed.map((item) =>
               item?.props?.markingMode
                 ? { ...item, props: { ...item.props, markingMode: false } }
                 : item
             );
+
+            // Auto-heal / assegura groupId para caixas brancas multiplicadas em cenários existentes
+            const railBoxes = initialList.filter(
+              (it) => it.type === "box" && (it.props?.rail || it.props?.trilho) && !it.groupId && !it.props?.groupId
+            );
+            if (railBoxes.length > 1) {
+              const healedGroupId = `box_group_restored_${Date.now()}`;
+              railBoxes.forEach((b) => {
+                b.groupId = healedGroupId;
+                if (!b.props) b.props = {};
+                b.props.groupId = healedGroupId;
+              });
+            }
+
+            return initialList;
           }
         }
       } catch (err) {
@@ -270,7 +285,9 @@ export function useSectorState() {
               position[2] - targetItem.position[2],
             ]
           : [0, 0, 0];
+        const deltaRotX = rotation ? rotation[0] - targetItem.rotation[0] : 0;
         const deltaRotY = rotation ? rotation[1] - targetItem.rotation[1] : 0;
+        const deltaRotZ = rotation ? rotation[2] - targetItem.rotation[2] : 0;
 
         setItems((prev) =>
           prev.map((item) => {
@@ -299,14 +316,34 @@ export function useSectorState() {
                 newPos[0] = Math.round((targetItem.position[0] + deltaPos[0] + rx) * 10000) / 10000;
                 newPos[2] = Math.round((targetItem.position[2] + deltaPos[2] + rz) * 10000) / 10000;
               }
+              if (Math.abs(deltaRotX) > 1e-6) {
+                const oy = newPos[1] - (targetItem.position[1] + deltaPos[1]);
+                const oz = newPos[2] - (targetItem.position[2] + deltaPos[2]);
+                const cos = Math.cos(deltaRotX);
+                const sin = Math.sin(deltaRotX);
+                const ry = oy * cos - oz * sin;
+                const rz = oy * sin + oz * cos;
+                newPos[1] = Math.round((targetItem.position[1] + deltaPos[1] + ry) * 10000) / 10000;
+                newPos[2] = Math.round((targetItem.position[2] + deltaPos[2] + rz) * 10000) / 10000;
+              }
+              if (Math.abs(deltaRotZ) > 1e-6) {
+                const ox = newPos[0] - (targetItem.position[0] + deltaPos[0]);
+                const oy = newPos[1] - (targetItem.position[1] + deltaPos[1]);
+                const cos = Math.cos(deltaRotZ);
+                const sin = Math.sin(deltaRotZ);
+                const rx = ox * cos - oy * sin;
+                const ry = ox * sin + oy * cos;
+                newPos[0] = Math.round((targetItem.position[0] + deltaPos[0] + rx) * 10000) / 10000;
+                newPos[1] = Math.round((targetItem.position[1] + deltaPos[1] + ry) * 10000) / 10000;
+              }
 
               return {
                 ...item,
                 position: newPos,
                 rotation: [
-                  item.rotation[0],
+                  Math.round((item.rotation[0] + deltaRotX) * 10000) / 10000,
                   Math.round((item.rotation[1] + deltaRotY) * 10000) / 10000,
-                  item.rotation[2],
+                  Math.round((item.rotation[2] + deltaRotZ) * 10000) / 10000,
                 ],
                 scale: scale !== undefined ? scale : (item.scale || [1, 1, 1]),
               };
@@ -440,7 +477,8 @@ export function useSectorState() {
         let newGroupId = target.groupId || target.props?.groupId;
         if (newGroupId) {
           if (!groupMap[newGroupId]) {
-            groupMap[newGroupId] = `drawer_group_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+            const prefix = target.type === "box" ? "box_group" : "drawer_group";
+            groupMap[newGroupId] = `${prefix}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
           }
           newGroupId = groupMap[newGroupId];
         }
@@ -608,12 +646,36 @@ export function useSectorState() {
       const hasRail = Boolean(target.props?.rail || target.props?.trilho);
       const hasVaral = Boolean(hasRail && target.props?.varal);
 
-      // Atualiza o item original para ser a Coluna 1 do grupo
+      const targetGroupId = target.groupId || target.props?.groupId;
+      const masterGroupId = targetGroupId || `box_group_${now}`;
+
+      // Localiza todas as caixas pertencentes ao mesmo grupo ou cadeia de caixas conectadas
+      const connectedBoxIds = new Set([target.id]);
+      if (targetGroupId) {
+        items.forEach((it) => {
+          if (it.groupId === targetGroupId || it.props?.groupId === targetGroupId) {
+            connectedBoxIds.add(it.id);
+          }
+        });
+      } else if (hasRail) {
+        items.forEach((it) => {
+          if (it.type === "box" && (it.props?.rail || it.props?.trilho)) {
+            const dy = Math.abs((it.position?.[1] ?? 0) - (target.position?.[1] ?? 0));
+            if (dy < 0.05 && (it.props?.connectedLeft || it.props?.connectedRight)) {
+              connectedBoxIds.add(it.id);
+            }
+          }
+        });
+      }
+
+      // Atualiza o item original para conter o groupId e ser a Coluna 1 do grupo
       const updatedOriginal = {
         ...target,
+        groupId: masterGroupId,
         name: target.name?.match(/\s+\d+$/) ? target.name : `${baseName} 1`,
         props: {
           ...target.props,
+          groupId: masterGroupId,
           rail: hasRail,
           trilho: hasRail,
           varal: hasVaral,
@@ -622,7 +684,7 @@ export function useSectorState() {
         },
       };
 
-      // Cria as count - 1 novas colunas independentes à direita
+      // Cria as count - 1 novas colunas à direita
       const newItems = [];
       const newIds = [target.id];
       for (let i = 1; i < count; i++) {
@@ -639,11 +701,13 @@ export function useSectorState() {
         newItems.push({
           id: colId,
           type: "box",
+          groupId: masterGroupId,
           name: `${baseName} ${i + 1}`,
           position: colPos,
           rotation: [...rot],
           props: {
             ...JSON.parse(JSON.stringify(target.props || {})),
+            groupId: masterGroupId,
             colorSeed: Math.random(),
             rail: hasRail,
             trilho: hasRail,
@@ -655,12 +719,27 @@ export function useSectorState() {
       }
 
       setItems((prev) => {
-        const updated = prev.map((it) => (it.id === id ? updatedOriginal : it));
+        const updated = prev.map((it) => {
+          if (it.id === id) {
+            return updatedOriginal;
+          }
+          if (connectedBoxIds.has(it.id)) {
+            return {
+              ...it,
+              groupId: masterGroupId,
+              props: {
+                ...it.props,
+                groupId: masterGroupId,
+              },
+            };
+          }
+          return it;
+        });
         return [...updated, ...newItems];
       });
 
-      // Seleciona todas as colunas multiplicadas para facilitar movimentação conjunta
-      setSelectedIds(newIds);
+      // Mantém a caixa alvo selecionada, funcionando em conjunto com todo o grupo
+      setSelectedIds([target.id]);
     },
     [items, pushHistory]
   );
@@ -755,7 +834,8 @@ export function useSectorState() {
       let newGroupId = target.groupId || target.props?.groupId;
       if (newGroupId) {
         if (!groupMap[newGroupId]) {
-          groupMap[newGroupId] = `drawer_group_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+          const prefix = target.type === "box" ? "box_group" : "drawer_group";
+          groupMap[newGroupId] = `${prefix}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
         }
         newGroupId = groupMap[newGroupId];
       }

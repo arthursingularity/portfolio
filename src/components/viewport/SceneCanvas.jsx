@@ -9,6 +9,7 @@ import EditableItem from "./EditableItem";
 import BlenderScaleModal from "./BlenderScaleModal";
 import BlenderGrabModal from "./BlenderGrabModal";
 import BlenderAxisGuide from "./BlenderAxisGuide";
+import SelectionGizmo from "./SelectionGizmo";
 
 /**
  * Helper component inside Canvas to keep camera, viewport size, and renderer live
@@ -132,13 +133,15 @@ export default function SceneCanvas({
   onUpdateProps,
   controlsRef,
   exportGroupRef,
+  targetRegistryRef: externalTargetRegistryRef,
 }) {
   const containerRef = useRef(null);
   const localControlsRef = useRef(null);
   const activeControls = controlsRef || localControlsRef;
   const localExportRef = useRef(null);
   const activeExportRef = exportGroupRef || localExportRef;
-  const targetRegistryRef = useRef({});
+  const localTargetRegistryRef = useRef({});
+  const targetRegistryRef = externalTargetRegistryRef || localTargetRegistryRef;
   const projectorRef = useRef(null);
   const dragStateRef = useRef(null);
   const justFinishedBoxDragRef = useRef(false);
@@ -542,6 +545,27 @@ export default function SceneCanvas({
             />
           ))}
         </group>
+
+        {/* Centralized 3D Selection Gizmo (Mover / Rotacionar at Model / Selection Center) */}
+        <SelectionGizmo
+          selectedItems={activeSelectedItems}
+          selectedId={selectedId}
+          allItems={items}
+          targetRegistryRef={targetRegistryRef}
+          transformMode={transformMode}
+          axisLock={axisLock}
+          snapToGrid={snapToGrid}
+          gridSnapSize={0.025}
+          orbitControlsRef={activeControls}
+          hideGizmo={false}
+          isModalGrab={isModalGrab}
+          isTransformingRef={isTransformingRef}
+          justFinishedTransformRef={justFinishedTransformRef}
+          onTransformStart={handleTransformStart}
+          onTransformEnd={handleTransformEnd}
+          onUpdateTransform={onUpdateTransform}
+          onUpdateTransforms={onUpdateTransforms}
+        />
 
         {/* Blender Modal Move / Grab (G + Axis X/Y/Z + Mouse Move) */}
         <BlenderGrabModal

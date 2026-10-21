@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { useThree } from "@react-three/fiber";
+import { getSelectionWorldCenter } from "./transformUtils";
 
 /**
  * BlenderGrabModal (Mover G - Blender Style)
@@ -21,6 +22,7 @@ import { useThree } from "@react-three/fiber";
 export default function BlenderGrabModal({
   selectedItem,
   selectedItems = [],
+  allItems = [],
   onUpdateTransform,
   onUpdateTransforms,
   targetRegistryRef,
@@ -110,22 +112,63 @@ export default function BlenderGrabModal({
       return;
     }
 
-    // Calcula o pivô 3D (média das posições dos itens selecionados)
-    const pivot = new THREE.Vector3();
-    const initMap = {};
+    // Se já estiver no meio de um grab ativo, não reinicia
+    if (stateRef.current.isGrabbing) {
+      return;
+    }
+
+    // Include all items in the selection, plus any items belonging to the same group (e.g. Gaveta G prateleira)
+    const groupIds = new Set();
     rawTargets.forEach((it) => {
+      const gid = it.groupId || it.props?.groupId;
+      if (gid) groupIds.add(gid);
+    });
+
+    let effectiveTargets = rawTargets;
+    if (allItems && allItems.length > 0) {
+      const others = allItems.filter((it) => {
+        if (rawTargets.some((r) => r.id === it.id)) return false;
+        const gid = it.groupId || it.props?.groupId;
+        if (gid && groupIds.has(gid)) return true;
+        // Fallback: gavetas G empilhadas na mesma prateleira/coluna caso não possuam groupId explícito
+        if (it.type === "drawer_g") {
+          return rawTargets.some((r) => {
+            if (r.type !== "drawer_g") return false;
+            const dx = Math.abs((it.position?.[0] ?? 0) - (r.position?.[0] ?? 0));
+            const dz = Math.abs((it.position?.[2] ?? 0) - (r.position?.[2] ?? 0));
+            return dx < 0.05 && dz < 0.05;
+          });
+        }
+        // Fallback: Caixas Brancas conectadas por varal/trilho caso não possuam groupId explícito
+        if (it.type === "box" && (it.props?.rail || it.props?.trilho)) {
+          return rawTargets.some((r) => {
+            if (r.type !== "box") return false;
+            if (!r.props?.rail && !r.props?.trilho) return false;
+            const dy = Math.abs((it.position?.[1] ?? 0) - (r.position?.[1] ?? 0));
+            return dy < 0.05 && (it.props?.connectedLeft || it.props?.connectedRight || r.props?.connectedLeft || r.props?.connectedRight);
+          });
+        }
+        return false;
+      });
+      effectiveTargets = [...rawTargets, ...others];
+    }
+
+    // Calcula o pivô 3D no centro geométrico da seleção ou da prateleira de gavetas
+    const pivot = getSelectionWorldCenter(effectiveTargets, targetRegistryRef?.current);
+
+    // Inicializa o mapa de posições iniciais de TODOS os itens efetivos (incluindo todo o grupo/prateleira)
+    const initMap = {};
+    effectiveTargets.forEach((it) => {
       const node = targetRegistryRef?.current?.[it.id];
       const curPos = node
         ? new THREE.Vector3(node.position.x, node.position.y, node.position.z)
         : new THREE.Vector3(it.position[0], it.position[1], it.position[2]);
       initMap[it.id] = curPos.clone();
-      pivot.add(curPos);
     });
-    pivot.divideScalar(rawTargets.length);
 
     stateRef.current.pivot3D = pivot;
     stateRef.current.initialData = initMap;
-    stateRef.current.activeTargets = rawTargets;
+    stateRef.current.activeTargets = effectiveTargets;
     stateRef.current.isGrabbing = true;
     stateRef.current.axisLock = axisLock || null;
     stateRef.current.axisSpace = axisLock ? "global" : "none";
@@ -164,6 +207,7 @@ export default function BlenderGrabModal({
     isGrabActive,
     selectedItem,
     selectedItems,
+    allItems,
     axisLock,
     camera,
     gl,
@@ -431,6 +475,7 @@ export default function BlenderGrabModal({
             init.y + deltaVector.y,
             init.z + deltaVector.z
           );
+          node.updateMatrixWorld(true);
         }
       });
 

@@ -20,12 +20,92 @@ export default function ModelProperties({
   const [boxMultiplier, setBoxMultiplier] = useState(3);
   const [drawerMultiplier, setDrawerMultiplier] = useState(2);
   const [localName, setLocalName] = useState(item?.name || "");
+  const [drawerDividersInput, setDrawerDividersInput] = useState(
+    item?.props?.dividers !== undefined ? item.props.dividers : 1
+  );
 
   useEffect(() => {
     if (item?.name) {
       setLocalName(item.name);
     }
   }, [item?.id, item?.name]);
+
+  useEffect(() => {
+    if (item?.type === "drawer_g") {
+      setDrawerDividersInput(
+        item.props?.dividers !== undefined ? item.props.dividers : 1
+      );
+    }
+  }, [item?.id, item?.props?.dividers]);
+
+  const handleGenerateDividers = () => {
+    if (!item || item.type !== "drawer_g") return;
+    const rawVal = drawerDividersInput === "" ? 0 : parseInt(drawerDividersInput, 10);
+    const qty = isNaN(rawVal) ? 0 : Math.min(2, Math.max(0, rawVal));
+
+    const currentComps = item.props?.compartments || [];
+
+    let newCompartments = [];
+    if (qty === 1) {
+      newCompartments = [
+        {
+          id: 1,
+          key: "esq",
+          label: "ESQUERDA",
+          name: currentComps[0]?.name || "D1",
+        },
+        {
+          id: 2,
+          key: "dir",
+          label: "DIREITA",
+          name: currentComps[1]?.name || "D2",
+        },
+      ];
+    } else if (qty === 2) {
+      newCompartments = [
+        {
+          id: 1,
+          key: "frente_esq",
+          label: "FRENTE ESQ",
+          name: currentComps[0]?.name || "D1",
+        },
+        {
+          id: 2,
+          key: "frente_dir",
+          label: "FRENTE DIR",
+          name: currentComps[1]?.name || "D2",
+        },
+        {
+          id: 3,
+          key: "fundo_esq",
+          label: "FUNDO ESQ",
+          name: currentComps[2]?.name || "D3",
+        },
+        {
+          id: 4,
+          key: "fundo_dir",
+          label: "FUNDO DIR",
+          name: currentComps[3]?.name || "D4",
+        },
+      ];
+    } else {
+      newCompartments = [];
+    }
+
+    onUpdateProps(item.id, {
+      dividers: qty,
+      compartments: newCompartments,
+    });
+  };
+
+  const handleUpdateCompartmentName = (index, newName) => {
+    if (!item) return;
+    const currentComps = item.props?.compartments || [];
+    const updated = currentComps.map((c, i) =>
+      i === index ? { ...c, name: newName } : c
+    );
+    onUpdateProps(item.id, { compartments: updated });
+  };
 
   if (!item) {
     return (
@@ -172,11 +252,10 @@ export default function ModelProperties({
                           key={preset}
                           type="button"
                           onClick={() => handleBoxCountChange(preset)}
-                          className={`py-1 rounded border text-[11px] font-mono tabular-nums  cursor-pointer ${
-                            isActive
+                          className={`py-1 rounded border text-[11px] font-mono tabular-nums  cursor-pointer ${isActive
                               ? "bg-white border-white text-black font-semibold shadow-sm"
                               : "bg-[#121214] border-white/[0.08] text-white/60 hover:text-white hover:border-white/25"
-                          }`}
+                            }`}
                           title={`${preset} caixas (${preset / 5} ${preset / 5 === 1 ? "camada" : "camadas"})`}
                         >
                           {preset}
@@ -214,11 +293,10 @@ export default function ModelProperties({
                         onClick={() =>
                           onUpdateProps(item.id, { boxColor: c.hex })
                         }
-                        className={`h-7 rounded border  cursor-pointer flex items-center justify-center relative ${
-                          isSelected
+                        className={`h-7 rounded border  cursor-pointer flex items-center justify-center relative ${isSelected
                             ? "border-white ring-1 ring-white scale-[1.03]"
                             : "border-white/10 hover:border-white/40 opacity-80 hover:opacity-100"
-                        }`}
+                          }`}
                         style={{ backgroundColor: c.hex }}
                       >
                       </button>
@@ -355,11 +433,10 @@ export default function ModelProperties({
                     type="button"
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
-                    className={`w-5 h-5 rounded border ${
-                      (item.props.color || "#d1d5db") === c.hex
+                    className={`w-5 h-5 rounded border ${(item.props.color || "#d1d5db") === c.hex
                         ? "border-white ring-1 ring-white"
                         : "border-white/20 hover:border-white/60"
-                    }`}
+                      }`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -408,11 +485,10 @@ export default function ModelProperties({
                             height: preset.h,
                           })
                         }
-                        className={`py-1 px-1 rounded border text-[10px] font-mono ${
-                          isMatch
+                        className={`py-1 px-1 rounded border text-[10px] font-mono ${isMatch
                             ? "bg-white text-black border-white font-semibold"
                             : "border-white/10 text-white/70 hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         {preset.label}
                       </button>
@@ -540,11 +616,10 @@ export default function ModelProperties({
                     type="button"
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
-                    className={`w-5 h-5 rounded border ${
-                      (item.props.color || "#383d42") === c.hex
+                    className={`w-5 h-5 rounded border ${(item.props.color || "#383d42") === c.hex
                         ? "border-white ring-1 ring-white"
                         : "border-white/20 hover:border-white/60"
-                    }`}
+                      }`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -595,11 +670,10 @@ export default function ModelProperties({
                             depth: preset.d,
                           })
                         }
-                        className={`py-1 px-1 rounded border text-[10px] font-mono  ${
-                          isMatch
+                        className={`py-1 px-1 rounded border text-[10px] font-mono  ${isMatch
                             ? "bg-white text-black border-white font-semibold"
                             : "border-white/10 text-white/70 hover:bg-white/10"
-                        }`}
+                          }`}
                       >
                         {preset.label}
                       </button>
@@ -725,11 +799,10 @@ export default function ModelProperties({
                     type="button"
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
-                    className={`w-5 h-5 rounded border ${
-                      (item.props.color || "#3b82f6") === c.hex
+                    className={`w-5 h-5 rounded border ${(item.props.color || "#3b82f6") === c.hex
                         ? "border-white ring-1 ring-white"
                         : "border-white/20 hover:border-white/60"
-                    }`}
+                      }`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -806,19 +879,19 @@ export default function ModelProperties({
               </div>
 
               {/* Modo Marcação */}
-                <div className="flex flex-col space-y-[4px] space-x-1">
-                  <span className="text-[12px] text-neutral-400">Marcação</span>
-                  <div
-                    onClick={() =>
-                      onUpdateProps(item.id, {
-                        markingMode: !item.props.markingMode,
-                      })
-                    }
-                    className={`buttonHover relative rounded-full p-[2px] w-[54px] ${item.props.markingMode ? 'bg-green-500' : 'bg-neutral-700'}`}
-                  >
-                    <div className={`rounded-full w-[20px] h-[20px] bg-white shadow-lg ${item.props.markingMode ? 'ml-auto' : ''}`} />
-                  </div>
+              <div className="flex flex-col space-y-[4px] space-x-1">
+                <span className="text-[12px] text-neutral-400">Marcação</span>
+                <div
+                  onClick={() =>
+                    onUpdateProps(item.id, {
+                      markingMode: !item.props.markingMode,
+                    })
+                  }
+                  className={`buttonHover relative rounded-full p-[2px] w-[54px] ${item.props.markingMode ? 'bg-green-500' : 'bg-neutral-700'}`}
+                >
+                  <div className={`rounded-full w-[20px] h-[20px] bg-white shadow-lg ${item.props.markingMode ? 'ml-auto' : ''}`} />
                 </div>
+              </div>
             </div>
 
             {/* Linha divisória */}
@@ -1290,11 +1363,10 @@ export default function ModelProperties({
                     type="button"
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
-                    className={`w-5 h-5 rounded border ${
-                      (item.props.color || "#26272B") === c.hex
+                    className={`w-5 h-5 rounded border ${(item.props.color || "#26272B") === c.hex
                         ? "border-white ring-1 ring-white"
                         : "border-white/20 hover:border-white/60"
-                    }`}
+                      }`}
                     style={{ backgroundColor: c.hex }}
                   />
                 ))}
@@ -1355,6 +1427,84 @@ export default function ModelProperties({
                 >
                   Multiplicar
                 </button>
+              </div>
+            </div>
+
+            {/* Linha divisória */}
+            <div className="h-[1px] w-auto bg-neutral-700/70" />
+
+            {/* ─── Divisórias & Compartimentos da Gaveta ─── */}
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] text-neutral-400 font-medium">
+                  Divisórias da Gaveta
+                </span>
+              </div>
+
+              {/* Input de Quantidade + Botão Gerar */}
+              <div className="flex items-center gap-2">
+                <div className="flex-1 flex items-center bg-[#121214] border border-white/[0.08] focus-within:border-white/25 rounded px-2 h-[28px]">
+                  <span className="text-[11px] text-neutral-400 shrink-0">
+                    Qtd (1 ou 2):
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    max="2"
+                    step="1"
+                    value={drawerDividersInput}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      if (raw === "") {
+                        setDrawerDividersInput("");
+                        return;
+                      }
+                      const val = parseInt(raw, 10);
+                      if (!isNaN(val)) {
+                        setDrawerDividersInput(Math.min(2, Math.max(0, val)));
+                      }
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        handleGenerateDividers();
+                      }
+                    }}
+                    placeholder="1 ou 2"
+                    className="w-full bg-transparent text-white outline-none font-mono text-xs text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleGenerateDividers}
+                  className="bg-primary-300 buttonHover text-black font-mnedium text-xs px-3 h-[28px] rounded shrink-0 cursor-pointer flex items-center gap-1 shadow-sm"
+                  title="Gerar divisórias de madeira e compartimentos"
+                >
+                  <span>Dividir</span>
+                </button>
+              </div>
+
+              {/* Botões rápidos de seleção 0, 1 ou 2 */}
+              <div className="flex items-center gap-1">
+                {[
+                  { qty: 0, label: "0 (Nenhuma)" },
+                  { qty: 1, label: "1 (2 vagas)" },
+                  { qty: 2, label: "2 (4 vagas)" },
+                ].map((opt) => (
+                  <button
+                    key={opt.qty}
+                    type="button"
+                    onClick={() => {
+                      setDrawerDividersInput(opt.qty);
+                    }}
+                    className={`flex-1 py-1 rounded border text-[10px] font-mono transition-colors cursor-pointer ${Number(drawerDividersInput) === opt.qty
+                        ? "bg-white/[0.12] border-white/40 text-white font-medium"
+                        : "bg-[#121214] border-white/[0.06] text-white/50 hover:text-white/80"
+                      }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
           </div>

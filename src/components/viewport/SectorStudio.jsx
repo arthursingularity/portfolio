@@ -120,6 +120,7 @@ export default function SectorStudio() {
   const [isModalGrab, setIsModalGrab] = useState(false);
   const viewportRef = useRef(null);
   const lastMousePos = useRef({ x: 0, y: 0 });
+  const targetRegistryRef = useRef({});
 
   // Se mudar de seleção enquanto em modo 'size' para um objeto que não permite alterar tamanho, reseta para 'select'
   useEffect(() => {
@@ -543,6 +544,7 @@ export default function SectorStudio() {
             snapToGrid={snapToGrid}
             controlsRef={controlsRef}
             exportGroupRef={exportGroupRef}
+            targetRegistryRef={targetRegistryRef}
           />
 
           {/* ── Popups Fixos (Canto Inferior Direito do Cenário 3D) ── */}
@@ -567,8 +569,10 @@ export default function SectorStudio() {
                 <TransformPopup
                   selectedItem={selectedItem}
                   selectedItems={selectedItems}
+                  allItems={items}
                   onUpdateTransform={updateTransform}
                   onUpdateTransforms={updateTransforms}
+                  targetRegistryRef={targetRegistryRef}
                 />
               </div>
             </div>
@@ -588,6 +592,7 @@ export default function SectorStudio() {
             onToggleVisibility={toggleVisibility}
             onDuplicate={duplicateItem}
             onUpdateName={updateName}
+            onUpdateProps={updateProps}
             onSave={handleSaveScene}
             saveStatus={saveStatus}
             saveMessage={saveMessage}

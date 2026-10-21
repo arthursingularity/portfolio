@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import * as THREE from "three";
 import { Icon } from "@iconify/react";
+import { getModelLocalCenter, getSelectionWorldCenter } from "./transformUtils";
 
 /**
  * TransformPopup - Manipulador Fixo de Posição e Rotação
@@ -11,8 +13,10 @@ import { Icon } from "@iconify/react";
 export default function TransformPopup({
   selectedItem,
   selectedItems = [],
+  allItems = [],
   onUpdateTransform,
   onUpdateTransforms,
+  targetRegistryRef,
   className = "",
 }) {
   const activeItems =
@@ -22,13 +26,37 @@ export default function TransformPopup({
         ? [selectedItem]
         : [];
 
+  const effectiveGroupItems = React.useMemo(() => {
+    if (!activeItems || activeItems.length === 0) return [];
+    const groupIds = new Set();
+    activeItems.forEach((it) => {
+      const gid = it.groupId || it.props?.groupId;
+      if (gid) groupIds.add(gid);
+    });
+
+    if (groupIds.size === 0 || !allItems || allItems.length === 0) {
+      return activeItems;
+    }
+
+    const map = new Map();
+    activeItems.forEach((it) => map.set(it.id, it));
+    allItems.forEach((it) => {
+      const gid = it.groupId || it.props?.groupId;
+      if (gid && groupIds.has(gid)) {
+        map.set(it.id, it);
+      }
+    });
+    return Array.from(map.values());
+  }, [activeItems, allItems]);
+
   const primaryItem = selectedItem || activeItems[0] || null;
-  const isMulti = activeItems.length > 1;
+  const isMulti = activeItems.length > 1 || effectiveGroupItems.length > 1;
 
   // Local input state for smooth typing without race conditions
   const [posX, setPosX] = useState("");
   const [posY, setPosY] = useState("");
   const [posZ, setPosZ] = useState("");
+  const [rotX, setRotX] = useState("");
   const [rotY, setRotY] = useState("");
   const [focusedField, setFocusedField] = useState(null);
 
@@ -47,7 +75,13 @@ export default function TransformPopup({
     if (focusedField !== "z") {
       setPosZ(String(primaryItem.position ? primaryItem.position[1] : 0));
     }
-    if (focusedField !== "rot") {
+    if (focusedField !== "rotX") {
+      const radX = primaryItem.rotation ? primaryItem.rotation[0] : 0;
+      let deg = Math.round((radX * 180) / Math.PI);
+      deg = ((deg % 360) + 360) % 360;
+      setRotX(String(deg));
+    }
+    if (focusedField !== "rotY") {
       const radY = primaryItem.rotation ? primaryItem.rotation[1] : 0;
       let deg = Math.round((radY * 180) / Math.PI);
       deg = ((deg % 360) + 360) % 360;
@@ -58,6 +92,7 @@ export default function TransformPopup({
     primaryItem?.position?.[0],
     primaryItem?.position?.[1],
     primaryItem?.position?.[2],
+    primaryItem?.rotation?.[0],
     primaryItem?.rotation?.[1],
     focusedField,
   ]);
@@ -73,8 +108,9 @@ export default function TransformPopup({
     const currentVal = primaryItem.position ? primaryItem.position[axisIdx] : 0;
     const delta = rounded - currentVal;
 
-    if (isMulti) {
-      const updates = activeItems.map((it) => {
+    const targets = effectiveGroupItems.length > 0 ? effectiveGroupItems : activeItems;
+    if (targets.length > 1 && onUpdateTransforms) {
+      const updates = targets.map((it) => {
         const p = [...(it.position || [0, 0, 0])];
         p[axisIdx] = Math.round((p[axisIdx] + delta) * 100) / 100;
         return { id: it.id, position: p };
@@ -87,128 +123,104 @@ export default function TransformPopup({
     }
   };
 
-  // Quick Rotate by degrees (+90, -90, or any delta)
-  const rotateBy = (deltaDeg) => {
+  // Centralized rotation around model center (or center between models for multi-selection)
+  const performRotation = (axis, deltaDeg) => {
     const deltaRad = (deltaDeg * Math.PI) / 180;
-    if (isMulti) {
-      // Calculate group median center pivot (average of X and Z positions)
-      let sumX = 0;
-      let sumZ = 0;
-      let validCount = 0;
-      activeItems.forEach((it) => {
-        if (it.position && it.position.length >= 3) {
-          sumX += it.position[0];
-          sumZ += it.position[2];
-          validCount++;
-        }
-      });
-      const cx = validCount > 0 ? sumX / validCount : 0;
-      const cz = validCount > 0 ? sumZ / validCount : 0;
+    if (Math.abs(deltaRad) < 1e-6) return;
 
-      const cos = Math.cos(deltaRad);
-      const sin = Math.sin(deltaRad);
+    const targets = effectiveGroupItems.length > 0 ? effectiveGroupItems : activeItems;
 
-      const updates = activeItems.map((it) => {
-        const curPos = it.position || [0, 0, 0];
-        const curRot = it.rotation || [0, 0, 0];
+    // 1. Get the shared pivot center in world coordinates (center of selection or entire group)
+    const pivotCenter = getSelectionWorldCenter(targets, targetRegistryRef?.current);
 
-        // Orbit around the center pivot (cx, cz)
-        const dx = (curPos[0] ?? 0) - cx;
-        const dz = (curPos[2] ?? 0) - cz;
+    // 2. Rotation axis in world coordinates:
+    // 'horizontal' -> rotate around world Y axis (Three.js vertical axis)
+    // 'vertical' -> rotate around world X axis (pitch / tilt)
+    const rotAxis =
+      axis === "horizontal"
+        ? new THREE.Vector3(0, 1, 0)
+        : new THREE.Vector3(1, 0, 0);
 
-        const rotX = dx * cos + dz * sin;
-        const rotZ = -dx * sin + dz * cos;
+    const deltaQuat = new THREE.Quaternion().setFromAxisAngle(rotAxis, deltaRad);
 
-        const newX = Math.round((cx + rotX) * 10000) / 10000;
-        const newZ = Math.round((cz + rotZ) * 10000) / 10000;
-        const newY = curPos[1] ?? 0;
+    const updates = targets.map((it) => {
+      const node = targetRegistryRef?.current?.[it.id];
+      const curPos = node
+        ? node.position.clone()
+        : new THREE.Vector3(it.position[0], it.position[1], it.position[2]);
+      const curRot = it.rotation || [0, 0, 0];
+      const curEuler = new THREE.Euler(curRot[0], curRot[1], curRot[2], "XYZ");
+      const curQuat = new THREE.Quaternion().setFromEuler(curEuler);
 
-        // Rotate individual orientation
-        let newRotY = (curRot[1] + deltaRad) % (Math.PI * 2);
-        if (newRotY < 0) newRotY += Math.PI * 2;
-        newRotY = Math.round(newRotY * 10000) / 10000;
+      // Local center offset of this item
+      const localCenter = getModelLocalCenter(node, it);
 
-        return {
-          id: it.id,
-          position: [newX, newY, newZ],
-          rotation: [curRot[0] || 0, newRotY, curRot[2] || 0],
-        };
-      });
+      // Current world center of this item:
+      // worldCenter = curPos + curQuat * localCenter
+      const itemWorldCenter = curPos.clone().add(localCenter.clone().applyQuaternion(curQuat));
 
+      // Orbit item's world center around the shared pivotCenter:
+      const offset = itemWorldCenter.clone().sub(pivotCenter);
+      offset.applyQuaternion(deltaQuat);
+      const newWorldCenter = pivotCenter.clone().add(offset);
+
+      // New orientation of item:
+      const newQuat = deltaQuat.clone().multiply(curQuat);
+      const newEuler = new THREE.Euler().setFromQuaternion(newQuat, "XYZ");
+
+      // New base position = newWorldCenter - newQuat * localCenter:
+      const newPos = newWorldCenter.clone().sub(localCenter.clone().applyQuaternion(newQuat));
+
+      return {
+        id: it.id,
+        position: [
+          Math.round(newPos.x * 10000) / 10000,
+          Math.round(newPos.y * 10000) / 10000,
+          Math.round(newPos.z * 10000) / 10000,
+        ],
+        rotation: [
+          Math.round(newEuler.x * 10000) / 10000,
+          Math.round(newEuler.y * 10000) / 10000,
+          Math.round(newEuler.z * 10000) / 10000,
+        ],
+      };
+    });
+
+    if (targets.length > 1 && onUpdateTransforms) {
       onUpdateTransforms(updates);
     } else {
-      const curRot = primaryItem.rotation || [0, 0, 0];
-      let newY = (curRot[1] + deltaRad) % (Math.PI * 2);
-      if (newY < 0) newY += Math.PI * 2;
-      newY = Math.round(newY * 10000) / 10000;
-      onUpdateTransform(primaryItem.id, {
-        rotation: [curRot[0] || 0, newY, curRot[2] || 0],
-      });
+      onUpdateTransform(primaryItem.id, updates[0]);
     }
   };
 
-  // Direct degree angle change
-  const applyRotationDeg = (newDegVal) => {
+  // Quick Rotate by degrees (+90, -90, or any delta) - Horizontal (Y axis)
+  const rotateByHorizontal = (deltaDeg) => {
+    performRotation("horizontal", deltaDeg);
+  };
+
+  // Direct degree angle change - Horizontal
+  const applyRotationDegHorizontal = (newDegVal) => {
     const targetDeg = parseFloat(newDegVal);
     if (isNaN(targetDeg)) return;
     const targetRad = (targetDeg * Math.PI) / 180;
     const curRad = primaryItem.rotation ? primaryItem.rotation[1] : 0;
     const deltaRad = targetRad - curRad;
+    performRotation("horizontal", (deltaRad * 180) / Math.PI);
+  };
 
-    if (Math.abs(deltaRad) < 1e-6) return;
+  // Quick Rotate by degrees (+90, 180, or any delta) - Vertical (Three.js X axis)
+  const rotateByVertical = (deltaDeg) => {
+    performRotation("vertical", deltaDeg);
+  };
 
-    if (isMulti) {
-      // Calculate group median center pivot (average of X and Z positions)
-      let sumX = 0;
-      let sumZ = 0;
-      let validCount = 0;
-      activeItems.forEach((it) => {
-        if (it.position && it.position.length >= 3) {
-          sumX += it.position[0];
-          sumZ += it.position[2];
-          validCount++;
-        }
-      });
-      const cx = validCount > 0 ? sumX / validCount : 0;
-      const cz = validCount > 0 ? sumZ / validCount : 0;
-
-      const cos = Math.cos(deltaRad);
-      const sin = Math.sin(deltaRad);
-
-      const updates = activeItems.map((it) => {
-        const curPos = it.position || [0, 0, 0];
-        const curRot = it.rotation || [0, 0, 0];
-
-        const dx = (curPos[0] ?? 0) - cx;
-        const dz = (curPos[2] ?? 0) - cz;
-
-        const rotX = dx * cos + dz * sin;
-        const rotZ = -dx * sin + dz * cos;
-
-        const newX = Math.round((cx + rotX) * 10000) / 10000;
-        const newZ = Math.round((cz + rotZ) * 10000) / 10000;
-        const newY = curPos[1] ?? 0;
-
-        let newRotY = (curRot[1] + deltaRad) % (Math.PI * 2);
-        if (newRotY < 0) newRotY += Math.PI * 2;
-        newRotY = Math.round(newRotY * 10000) / 10000;
-
-        return {
-          id: it.id,
-          position: [newX, newY, newZ],
-          rotation: [curRot[0] || 0, newRotY, curRot[2] || 0],
-        };
-      });
-
-      onUpdateTransforms(updates);
-    } else {
-      const curRot = primaryItem.rotation || [0, 0, 0];
-      let newY = ((targetRad % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-      newY = Math.round(newY * 10000) / 10000;
-      onUpdateTransform(primaryItem.id, {
-        rotation: [curRot[0] || 0, newY, curRot[2] || 0],
-      });
-    }
+  // Direct degree angle change - Vertical
+  const applyRotationDegVertical = (newDegVal) => {
+    const targetDeg = parseFloat(newDegVal);
+    if (isNaN(targetDeg)) return;
+    const targetRad = (targetDeg * Math.PI) / 180;
+    const curRad = primaryItem.rotation ? primaryItem.rotation[0] : 0;
+    const deltaRad = targetRad - curRad;
+    performRotation("vertical", (deltaRad * 180) / Math.PI);
   };
 
   // Snap to ground (Z / Altura = 0)
@@ -350,53 +362,120 @@ export default function TransformPopup({
           <span className="text-[12px] text-neutral-400">Rotação</span>
         </div>
 
-        <div className="flex items-center gap-1">
-          {/* Girar 90° */}
-          <button
-            type="button"
-            onClick={() => rotateBy(-90)}
-            title="Girar -90°"
-            className="flex-1 py-1.5 rounded bg-neutral-700/70 text-[11px] font-mono text-white buttonHover flex items-center justify-center gap-1 "
-          >
-            <Icon icon="lucide:rotate-ccw" className="text-[12px] mr-[2px]" />
-            90°
-          </button>
-
-          {/* Campo Numérico de Graus */}
-          <div className="flex-[1.2] flex items-center bg-[#0a0a0c] border border-white/[0.08] focus-within:border-white/25 rounded px-1.5 py-1.5 text-[11px] font-mono ">
-            <input
-              type="number"
-              step="15"
-              value={rotY}
-              onFocus={() => setFocusedField("rot")}
-              onChange={(e) => {
-                setRotY(e.target.value);
-                const val = parseFloat(e.target.value);
-                if (!isNaN(val)) applyRotationDeg(val);
-              }}
-              onBlur={() => {
-                setFocusedField(null);
-                const val = parseFloat(rotY);
-                if (!isNaN(val)) applyRotationDeg(val);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") e.currentTarget.blur();
-              }}
-              className="w-full bg-transparent text-white outline-none text-center font-mono"
-            />
-            <span className="text-white/30 text-[10px] select-none">°</span>
+        {/* Linha Horizontal */}
+        <div className="flex flex-col space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-neutral-400 font-medium">
+              Horizontal
+            </span>
           </div>
 
-          {/* Girar 180° */}
-          <button
-            type="button"
-            onClick={() => rotateBy(180)}
-            title="Girar -90°"
-            className="flex-1 py-1.5 rounded bg-neutral-700/70 text-[11px] font-mono text-white buttonHover flex items-center justify-center gap-1 "
-          >
-            <Icon icon="lucide:rotate-ccw" className="text-[12px] mr-[2px]" />
-            180°
-          </button>
+          <div className="flex items-center gap-1 font-mono">
+            {/* Girar 90° Horizontal */}
+            <button
+              type="button"
+              onClick={() => rotateByHorizontal(-90)}
+              title="Girar 90° horizontalmente"
+              className="flex-1 py-1.5 rounded bg-neutral-700/70 text-[11px] font-mono text-white buttonHover flex items-center justify-center gap-1"
+            >
+              <Icon icon="lucide:rotate-ccw" className="text-[12px] mr-[2px]" />
+              90°
+            </button>
+
+            {/* Campo Numérico de Graus Horizontal */}
+            <div className="flex-[1.2] flex items-center bg-[#0a0a0c] border border-white/[0.08] focus-within:border-white/25 rounded px-1.5 py-1.5 text-[11px] font-mono">
+              <input
+                type="number"
+                step="15"
+                value={rotY}
+                onFocus={() => setFocusedField("rotY")}
+                onChange={(e) => {
+                  setRotY(e.target.value);
+                  const val = parseFloat(e.target.value);
+                  if (!isNaN(val)) applyRotationDegHorizontal(val);
+                }}
+                onBlur={() => {
+                  setFocusedField(null);
+                  const val = parseFloat(rotY);
+                  if (!isNaN(val)) applyRotationDegHorizontal(val);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                className="w-full bg-transparent text-white outline-none text-center font-mono"
+              />
+              <span className="text-white/30 text-[10px] select-none">°</span>
+            </div>
+
+            {/* Girar 180° Horizontal */}
+            <button
+              type="button"
+              onClick={() => rotateByHorizontal(180)}
+              title="Girar 180° horizontalmente"
+              className="flex-1 py-1.5 rounded bg-neutral-700/70 text-[11px] font-mono text-white buttonHover flex items-center justify-center gap-1"
+            >
+              <Icon icon="lucide:rotate-ccw" className="text-[12px] mr-[2px]" />
+              180°
+            </button>
+          </div>
+        </div>
+
+        {/* Linha Vertical */}
+        <div className="flex flex-col space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] text-neutral-400 font-medium">
+              Vertical
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 font-mono">
+            {/* Girar 90° Vertical */}
+            <button
+              type="button"
+              onClick={() => rotateByVertical(90)}
+              title="Girar 90° verticalmente"
+              className="flex-1 py-1.5 rounded bg-neutral-700/70 text-[11px] font-mono text-white buttonHover flex items-center justify-center gap-1"
+            >
+              <Icon icon="lucide:rotate-cw" className="text-[12px] mr-[2px]" />
+              90°
+            </button>
+
+            {/* Campo Numérico de Graus Vertical */}
+            <div className="flex-[1.2] flex items-center bg-[#0a0a0c] border border-white/[0.08] focus-within:border-white/25 rounded px-1.5 py-1.5 text-[11px] font-mono">
+              <input
+                type="number"
+                step="15"
+                value={rotX}
+                onFocus={() => setFocusedField("rotX")}
+                onChange={(e) => {
+                  setRotX(e.target.value);
+                  const val = parseFloat(e.target.value);
+                  if (!isNaN(val)) applyRotationDegVertical(val);
+                }}
+                onBlur={() => {
+                  setFocusedField(null);
+                  const val = parseFloat(rotX);
+                  if (!isNaN(val)) applyRotationDegVertical(val);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") e.currentTarget.blur();
+                }}
+                className="w-full bg-transparent text-white outline-none text-center font-mono"
+              />
+              <span className="text-white/30 text-[10px] select-none">°</span>
+            </div>
+
+            {/* Girar 180° Vertical */}
+            <button
+              type="button"
+              onClick={() => rotateByVertical(180)}
+              title="Girar 180° verticalmente"
+              className="flex-1 py-1.5 rounded bg-neutral-700/70 text-[11px] font-mono text-white buttonHover flex items-center justify-center gap-1"
+            >
+              <Icon icon="lucide:rotate-cw" className="text-[12px] mr-[2px]" />
+              180°
+            </button>
+          </div>
         </div>
       </div>
     </div>

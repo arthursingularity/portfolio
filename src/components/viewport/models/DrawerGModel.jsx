@@ -6,9 +6,18 @@ import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferG
 
 // Dimensões base de referência (em metros)
 const BASE_DIMENSIONS = {
-  width: 0.31,
+  width: 0.36,
   depth: 0.44,
   height: 0.19, // Altura original: 190mm
+};
+
+// Dimensões das divisórias de madeira (em metros)
+// Altere estes valores facilmente para ajustar o tamanho das placas de madeira:
+const DIVISORIA_DIMENSIONS = {
+  width: 0.348,      // Largura da divisória transversal (ao longo do eixo X)
+  depth: 0.428,      // Comprimento da divisória longitudinal (ao longo do eixo Z)
+  height: 0.18,      // Altura das divisórias (ao longo do eixo Y)
+  thickness: 0.007,  // Espessura da chapa de madeira (7mm)
 };
 
 const TAMANHO_PADRAO = 10;
@@ -22,17 +31,24 @@ const geometryCache = new Map();
  * 2. cageFrameGeo: As 4 colunas verticais e 4 travessas inferiores de aço da gaiola
  * 3. ceilingPlateGeo: Placa superior / piso intermediário
  * 4. legsGeo & basePlateGeo: Pés e placa de chão para a base (Tier 0)
+ * 5. dividerLongGeo & dividerTransGeo: Divisórias de madeira personalizáveis
  */
-function getDrawerGeometries(W, D, H, topGap, effectiveLegH) {
-  const cacheKey = `${W.toFixed(4)}_${D.toFixed(4)}_${H.toFixed(4)}_${Number(topGap).toFixed(4)}_${effectiveLegH.toFixed(4)}`;
+function getDrawerGeometries(W, D, H, topGap, effectiveLegH, customDivDims = {}) {
+  const divDims = { ...DIVISORIA_DIMENSIONS, ...customDivDims };
+  const divW = Number(divDims.width) || (W - 0.012);
+  const divD = Number(divDims.depth) || (D - 0.012);
+  const divH = Number(divDims.height) || (H * 0.42);
+  const divThick = Number(divDims.thickness) || 0.007;
+
+  const cacheKey = `${W.toFixed(4)}_${D.toFixed(4)}_${H.toFixed(4)}_${Number(topGap).toFixed(4)}_${effectiveLegH.toFixed(4)}_${divW.toFixed(4)}_${divD.toFixed(4)}_${divH.toFixed(4)}_${divThick.toFixed(4)}`;
   if (geometryCache.has(cacheKey)) {
     return geometryCache.get(cacheKey);
   }
 
   const t = 0.006;               // Espessura sólida das paredes (6mm)
   const Hf = H * 0.42;           // Frente acompanha proporcionalmente a altura total
-  const bottomCurveH = H * 0.16; // Início da curva inferior
-  const bottomCurveZ = D * 0.09; // Recuo inferior em Z
+  const bottomCurveH = H * 0.30; // Início da curva inferior
+  const bottomCurveZ = D * 0.16; // Recuo inferior em Z
 
   // ─── DIMENSÕES DA GAIOLA ───
   const barSize = 0.012;         // Espessura das barras (12mm)
@@ -227,12 +243,82 @@ function getDrawerGeometries(W, D, H, topGap, effectiveLegH) {
     cageD - barSize * 2
   );
 
+  // ── 10. Divisória de Madeira 1 (Longitudinal - Frente/Fundo dividindo Esquerda e Direita) ──
+  const zFrontIn = zFront + t;
+  const zBackIn = Math.min(zRear - t, zFrontIn + divD);
+  const yMaxDiv = Math.min(H - 0.004, t + divH);
+
+  // Parâmetros do chanfro/rampa da lateral da gaveta (baseados em shapeSide)
+  const yRampBottom = Hf - 0.004; // Altura na boca frontal rebaixada
+  const yRampTop = H - 0.014;    // Altura onde a rampa encontra o topo
+  const zRampBottom = zFrontIn;
+  const zRampTop = zSlopeTop;
+
+  const shapeDivLong = new THREE.Shape();
+  // 1. Início na traseira sobre o piso interno
+  shapeDivLong.moveTo(Z(zBackIn), t);
+  // 2. Piso reto interno até o início da curva frontal
+  const zCurveStart = Math.min(zBackIn, zFront + bottomCurveZ);
+  shapeDivLong.lineTo(Z(zCurveStart), t);
+  // 3. Curvatura inferior que acompanha perfeitamente o perfil da gaveta
+  shapeDivLong.quadraticCurveTo(
+    Z(zFront + t + 0.006),
+    t + 0.004,
+    Z(zFrontIn),
+    Math.min(yMaxDiv, bottomCurveH)
+  );
+  // 4. Sobe pela parede frontal até a borda rebaixada da boca da gaveta
+  if (yMaxDiv > bottomCurveH) {
+    shapeDivLong.lineTo(Z(zFrontIn), Math.min(yMaxDiv, yRampBottom));
+  }
+  // 5. Acompanha o chanfro inclinado da lateral da gaveta (evita vazar para fora)
+  if (yMaxDiv > yRampBottom) {
+    if (yMaxDiv < yRampTop) {
+      const rampFrac = (yMaxDiv - yRampBottom) / (yRampTop - yRampBottom);
+      const zIntersect = zRampBottom + rampFrac * (zRampTop - zRampBottom);
+      shapeDivLong.lineTo(Z(zIntersect), yMaxDiv);
+    } else {
+      shapeDivLong.lineTo(Z(zRampTop), yRampTop);
+      shapeDivLong.quadraticCurveTo(
+        Z(zSlopeStart - 0.012),
+        yMaxDiv,
+        Z(zSlopeStart),
+        yMaxDiv
+      );
+    }
+  }
+  // 6. Linha reta no topo até a traseira
+  shapeDivLong.lineTo(Z(zBackIn), yMaxDiv);
+  // 7. Parede traseira vertical até o piso
+  shapeDivLong.lineTo(Z(zBackIn), t);
+  shapeDivLong.closePath();
+
+  const divider1Raw = new THREE.ExtrudeGeometry(shapeDivLong, {
+    steps: 1,
+    depth: divThick,
+    bevelEnabled: false,
+  });
+  divider1Raw.translate(0, 0, -divThick / 2);
+  divider1Raw.rotateY(Math.PI / 2);
+  divider1Raw.computeVertexNormals();
+  const dividerLongGeo = mergeVertices(divider1Raw);
+  divider1Raw.dispose();
+
+  // ── 11. Divisória de Madeira 2 (Transversal - Esquerda/Direita dividindo Frente e Fundo) ──
+  const divider2Raw = new THREE.BoxGeometry(divW, divH, divThick);
+  divider2Raw.translate(0, t + divH / 2, 0);
+  divider2Raw.computeVertexNormals();
+  const dividerTransGeo = mergeVertices(divider2Raw);
+  divider2Raw.dispose();
+
   const result = {
     drawerBodyGeo,
     cageFrameGeo,
     ceilingPlateGeo,
     legsGeo,
     basePlateGeo,
+    dividerLongGeo,
+    dividerTransGeo,
     barSize,
     cageH,
     plateThickness,
@@ -265,10 +351,13 @@ export default function DrawerGModel({
   depth,                  // Opcional: profundidade em metros
   height,                 // Opcional: altura em metros
   wireframe = false,
+  dividers = 0,
+  dividerDimensions,      // Opcional: override de dimensões das divisórias
 }) {
   const isIndividualTier = tierIndex !== undefined;
   const numDrawers = Math.min(5, Math.max(1, Number(quantity ?? levels) || 5));
   const scaleFactor = Math.max(0.01, (Number(tamanho) || TAMANHO_PADRAO) / TAMANHO_PADRAO);
+  const numDividers = Number(dividers) || 0;
 
   // Altura efetiva dos pés na base (0 se hasFeet for falso)
   const effectiveLegH = hasFeet ? Math.max(0.005, Number(legHeight) || 0.04) : 0;
@@ -300,13 +389,19 @@ export default function DrawerGModel({
         metalness: 0.12,
         wireframe,
       }),
+      woodDivider: new THREE.MeshStandardMaterial({
+        color: new THREE.Color("#c19a6b"),
+        roughness: 0.68,
+        metalness: 0.05,
+        wireframe,
+      }),
     };
   }, [color, cageColor, plateColor, wireframe]);
 
   // Obtém geometrias unificadas instantâneas do cache
   const geos = useMemo(() => {
-    return getDrawerGeometries(W, D, H, topGap, effectiveLegH);
-  }, [W, D, H, topGap, effectiveLegH]);
+    return getDrawerGeometries(W, D, H, topGap, effectiveLegH, dividerDimensions);
+  }, [W, D, H, topGap, effectiveLegH, dividerDimensions]);
 
   const tiersToRender = isIndividualTier
     ? [Number(tierIndex)]
@@ -346,6 +441,24 @@ export default function DrawerGModel({
               position={[0, Yi + geos.barSize, 0]}
               material={materials.drawer}
             />
+
+            {/* Divisória 1 de Madeira (Longitudinal) */}
+            {numDividers >= 1 && geos.dividerLongGeo && (
+              <mesh
+                geometry={geos.dividerLongGeo}
+                position={[0, Yi + geos.barSize, 0]}
+                material={materials.woodDivider}
+              />
+            )}
+
+            {/* Divisória 2 de Madeira (Transversal) */}
+            {numDividers >= 2 && geos.dividerTransGeo && (
+              <mesh
+                geometry={geos.dividerTransGeo}
+                position={[0, Yi + geos.barSize, 0]}
+                material={materials.woodDivider}
+              />
+            )}
 
             {/* 2. Gaiola estrutural completa (4 colunas + 4 travessas) em 1 único draw call */}
             <mesh

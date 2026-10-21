@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
 import { TransformControls } from "@react-three/drei";
@@ -34,9 +34,15 @@ export default function SelectionGizmo({
   onUpdateTransform,
   onUpdateTransforms,
 }) {
+  const [pivotNode, setPivotNode] = useState(null);
   const pivotRef = useRef(null);
   const controlsRef = useRef(null);
   const isDraggingRef = useRef(false);
+
+  const setPivotCallback = useCallback((node) => {
+    pivotRef.current = node;
+    setPivotNode(node);
+  }, []);
 
   const activeSelectedItems = useMemo(() => {
     if (selectedItems && selectedItems.length > 0) return selectedItems;
@@ -81,6 +87,24 @@ export default function SelectionGizmo({
     });
     return Array.from(map.values());
   }, [activeSelectedItems, allItems]);
+
+  // Centro geométrico imediato da seleção (calculado na renderização para nunca nascer em 0,0,0)
+  const initialCenter = useMemo(() => {
+    if (effectiveGroupItems.length === 0) return new THREE.Vector3(0, 0, 0);
+    return getSelectionWorldCenter(effectiveGroupItems, targetRegistryRef?.current);
+  }, [effectiveGroupItems, targetRegistryRef]);
+
+  // Sincroniza a posição inicial do pivot e força attach no TransformControls imediatamente
+  useEffect(() => {
+    if (pivotNode && !isDraggingRef.current) {
+      pivotNode.position.copy(initialCenter);
+      pivotNode.rotation.set(0, 0, 0);
+      if (controlsRef.current) {
+        controlsRef.current.attach(pivotNode);
+        controlsRef.current.updateMatrixWorld();
+      }
+    }
+  }, [pivotNode, initialCenter]);
 
   // Fix Three.js TransformControls cone geometries and apply Blender colors
   const fixGizmoCones = useCallback((controls) => {
@@ -128,7 +152,12 @@ export default function SelectionGizmo({
       return;
     }
     const center = getSelectionWorldCenter(effectiveGroupItems, targetRegistryRef?.current);
-    pivotRef.current.position.copy(center);
+    if (pivotRef.current.position.distanceToSquared(center) > 0.00001) {
+      pivotRef.current.position.copy(center);
+      if (controlsRef.current) {
+        controlsRef.current.updateMatrixWorld();
+      }
+    }
     if (!controlsRef.current?.dragging) {
       pivotRef.current.rotation.set(0, 0, 0);
     }
@@ -290,6 +319,7 @@ export default function SelectionGizmo({
       controls.removeEventListener("objectChange", handleObjectChange);
     };
   }, [
+    pivotNode,
     activeSelectedItems,
     allItems,
     selectedId,
@@ -321,11 +351,17 @@ export default function SelectionGizmo({
 
   return (
     <>
-      <group ref={pivotRef} name="__selection_gizmo_pivot" />
-      {pivotRef.current && (
+      <group
+        key={`pivot_${selectedId || "none"}`}
+        ref={setPivotCallback}
+        name="__selection_gizmo_pivot"
+        position={[initialCenter.x, initialCenter.y, initialCenter.z]}
+      />
+      {pivotNode && (
         <TransformControls
+          key={`tc_${selectedId || "none"}_${transformMode}`}
           ref={controlsRef}
-          object={pivotRef.current}
+          object={pivotNode}
           mode={transformMode}
           translationSnap={snapToGrid ? gridSnapSize || 0.025 : null}
           rotationSnap={snapToGrid ? 0.05 : null}

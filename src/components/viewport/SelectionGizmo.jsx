@@ -71,19 +71,6 @@ export default function SelectionGizmo({
       if (gid && groupIds.has(gid)) {
         map.set(it.id, it);
       }
-      // Fallback para Caixas Brancas conectadas por varal/trilho sem groupId explícito
-      if (!gid && it.type === "box" && (it.props?.rail || it.props?.trilho)) {
-        const isConnected = activeSelectedItems.some(
-          (r) =>
-            r.type === "box" &&
-            (r.props?.rail || r.props?.trilho) &&
-            Math.abs((it.position?.[1] ?? 0) - (r.position?.[1] ?? 0)) < 0.05 &&
-            (it.props?.connectedLeft || it.props?.connectedRight || r.props?.connectedLeft || r.props?.connectedRight)
-        );
-        if (isConnected) {
-          map.set(it.id, it);
-        }
-      }
     });
     return Array.from(map.values());
   }, [activeSelectedItems, allItems]);

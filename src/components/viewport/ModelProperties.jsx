@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Icon } from "@iconify/react";
 import ColorPicker from "./ColorPicker";
 
@@ -8,6 +8,7 @@ import { BOX_PALETTE_COLORS, DEFAULT_BOX_COLOR } from "./models/boxConfig";
 
 export default function ModelProperties({
   item,
+  items = [],
   onUpdateTransform,
   onUpdateProps,
   onUpdateName,
@@ -23,6 +24,32 @@ export default function ModelProperties({
   const [drawerDividersInput, setDrawerDividersInput] = useState(
     item?.props?.dividers !== undefined ? item.props.dividers : 1
   );
+
+  const isBoxMultiplied = useMemo(() => {
+    if (!item || item.type !== "box") return false;
+    if (item.props?.isMultiplied || item.isMultiplied) return true;
+    const gid = item.groupId || item.props?.groupId;
+    if (gid && Array.isArray(items)) {
+      const groupCount = items.filter(
+        (it) => it.type === "box" && (it.groupId === gid || it.props?.groupId === gid)
+      ).length;
+      if (groupCount > 1) return true;
+    }
+    return Boolean(item.props?.connectedLeft || item.props?.connectedRight);
+  }, [item, items]);
+
+  const isDrawerMultiplied = useMemo(() => {
+    if (!item || item.type !== "drawer_g") return false;
+    if (item.props?.isMultiplied || item.isMultiplied) return true;
+    const gid = item.groupId || item.props?.groupId;
+    if (gid && Array.isArray(items)) {
+      const groupCount = items.filter(
+        (it) => it.type === "drawer_g" && (it.groupId === gid || it.props?.groupId === gid)
+      ).length;
+      if (groupCount > 5) return true;
+    }
+    return false;
+  }, [item, items]);
 
   useEffect(() => {
     if (item?.name) {
@@ -253,8 +280,8 @@ export default function ModelProperties({
                           type="button"
                           onClick={() => handleBoxCountChange(preset)}
                           className={`py-1 rounded border text-[11px] font-mono tabular-nums  cursor-pointer ${isActive
-                              ? "bg-white border-white text-black font-semibold shadow-sm"
-                              : "bg-[#121214] border-white/[0.08] text-white/60 hover:text-white hover:border-white/25"
+                            ? "bg-white border-white text-black font-semibold shadow-sm"
+                            : "bg-[#121214] border-white/[0.08] text-white/60 hover:text-white hover:border-white/25"
                             }`}
                           title={`${preset} caixas (${preset / 5} ${preset / 5 === 1 ? "camada" : "camadas"})`}
                         >
@@ -294,8 +321,8 @@ export default function ModelProperties({
                           onUpdateProps(item.id, { boxColor: c.hex })
                         }
                         className={`h-7 rounded border  cursor-pointer flex items-center justify-center relative ${isSelected
-                            ? "border-white ring-1 ring-white scale-[1.03]"
-                            : "border-white/10 hover:border-white/40 opacity-80 hover:opacity-100"
+                          ? "border-white ring-1 ring-white scale-[1.03]"
+                          : "border-white/10 hover:border-white/40 opacity-80 hover:opacity-100"
                           }`}
                         style={{ backgroundColor: c.hex }}
                       >
@@ -434,8 +461,8 @@ export default function ModelProperties({
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
                     className={`w-5 h-5 rounded border ${(item.props.color || "#d1d5db") === c.hex
-                        ? "border-white ring-1 ring-white"
-                        : "border-white/20 hover:border-white/60"
+                      ? "border-white ring-1 ring-white"
+                      : "border-white/20 hover:border-white/60"
                       }`}
                     style={{ backgroundColor: c.hex }}
                   />
@@ -486,8 +513,8 @@ export default function ModelProperties({
                           })
                         }
                         className={`py-1 px-1 rounded border text-[10px] font-mono ${isMatch
-                            ? "bg-white text-black border-white font-semibold"
-                            : "border-white/10 text-white/70 hover:bg-white/10"
+                          ? "bg-white text-black border-white font-semibold"
+                          : "border-white/10 text-white/70 hover:bg-white/10"
                           }`}
                       >
                         {preset.label}
@@ -617,8 +644,8 @@ export default function ModelProperties({
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
                     className={`w-5 h-5 rounded border ${(item.props.color || "#383d42") === c.hex
-                        ? "border-white ring-1 ring-white"
-                        : "border-white/20 hover:border-white/60"
+                      ? "border-white ring-1 ring-white"
+                      : "border-white/20 hover:border-white/60"
                       }`}
                     style={{ backgroundColor: c.hex }}
                   />
@@ -671,8 +698,8 @@ export default function ModelProperties({
                           })
                         }
                         className={`py-1 px-1 rounded border text-[10px] font-mono  ${isMatch
-                            ? "bg-white text-black border-white font-semibold"
-                            : "border-white/10 text-white/70 hover:bg-white/10"
+                          ? "bg-white text-black border-white font-semibold"
+                          : "border-white/10 text-white/70 hover:bg-white/10"
                           }`}
                       >
                         {preset.label}
@@ -800,8 +827,8 @@ export default function ModelProperties({
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
                     className={`w-5 h-5 rounded border ${(item.props.color || "#3b82f6") === c.hex
-                        ? "border-white ring-1 ring-white"
-                        : "border-white/20 hover:border-white/60"
+                      ? "border-white ring-1 ring-white"
+                      : "border-white/20 hover:border-white/60"
                       }`}
                     style={{ backgroundColor: c.hex }}
                   />
@@ -1026,7 +1053,7 @@ export default function ModelProperties({
                 {/* Linha divisória */}
                 <div className="h-[1px] w-auto bg-neutral-700/70" />
 
-                {/* Opções Estruturais: Trilho e Varal (Lado a Lado) */}
+                {/* Opções Estruturais: Trilho, Varal e Duplo (Lado a Lado) */}
                 <div className="flex w-full space-x-2">
                   {/* Checkbox Trilho */}
                   <label className="flex w-full items-center justify-between py-1 px-1.5 rounded hover:bg-white/[0.04] cursor-pointer group border border-white/[0.06] bg-black/20">
@@ -1043,6 +1070,8 @@ export default function ModelProperties({
                           rail: nextRail,
                           trilho: nextRail,
                           varal: nextRail ? Boolean(item.props.varal) : false,
+                          doubleRail: nextRail ? Boolean(item.props.doubleRail || item.props.trilhoDuplo) : false,
+                          trilhoDuplo: nextRail ? Boolean(item.props.doubleRail || item.props.trilhoDuplo) : false,
                         });
                       }}
                       className="w-4 h-4 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300"
@@ -1051,7 +1080,7 @@ export default function ModelProperties({
 
                   {/* Checkbox Varal (habilitado apenas quando Trilho estiver marcado) */}
                   <label
-                    className={`w-full flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20 transition-opacity ${Boolean(item.props.rail || item.props.trilho)
+                    className={`w-full flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20  ${Boolean(item.props.rail || item.props.trilho)
                       ? "hover:bg-white/[0.04] cursor-pointer group"
                       : "opacity-40 cursor-not-allowed"
                       }`}
@@ -1078,6 +1107,40 @@ export default function ModelProperties({
                       className="w-4 h-4 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300 disabled:cursor-not-allowed"
                     />
                   </label>
+
+                  {/* Checkbox Trilho Duplo (habilitado apenas quando Trilho estiver marcado) */}
+                  <label
+                    className={`w-full flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20  ${Boolean(item.props.rail || item.props.trilho)
+                      ? "hover:bg-white/[0.04] cursor-pointer group"
+                      : "opacity-40 cursor-not-allowed"
+                      }`}
+                    title={
+                      Boolean(item.props.rail || item.props.trilho)
+                        ? "Ativar/desativar trilho duplo (+1 fileira)"
+                        : "O trilho duplo só pode ser marcado quando o Trilho estiver ativo"
+                    }
+                  >
+                    <span className="text-[11px] text-white/80 group-hover:text-white font-medium">
+                      Duplo
+                    </span>
+                    <input
+                      type="checkbox"
+                      id="box-double-rail-toggle"
+                      disabled={!Boolean(item.props.rail || item.props.trilho)}
+                      checked={Boolean(
+                        (item.props.rail || item.props.trilho) &&
+                        (item.props.doubleRail || item.props.trilhoDuplo)
+                      )}
+                      onChange={(e) => {
+                        const nextDouble = e.target.checked;
+                        onUpdateProps(item.id, {
+                          doubleRail: nextDouble,
+                          trilhoDuplo: nextDouble,
+                        });
+                      }}
+                      className="w-4 h-4 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300 disabled:cursor-not-allowed"
+                    />
+                  </label>
                 </div>
 
                 {/* Linha divisória */}
@@ -1089,19 +1152,23 @@ export default function ModelProperties({
                     <span className="text-[12px] text-neutral-400">
                       Multiplicar Colunas
                     </span>
-                    <span className="text-[12px] text-neutral-400">
-                      Conectar varais
+                    <span className="text-[11px] font-mono text-neutral-400">
+                      {isBoxMultiplied ? "Já multiplicado" : "Conectar varais"}
                     </span>
                   </div>
 
                   {/* Multiplicação Customizada */}
                   <div className="flex items-center space-x-2">
-                    <div className="flex items-center bg-[#121214] border border-white/[0.08] rounded-md px-2 text-[11px] w-full">
+                    <div
+                      className={`flex items-center bg-[#121214] border border-white/[0.08] rounded-md px-2 text-[11px] w-full  ${isBoxMultiplied ? "opacity-35 cursor-not-allowed" : ""
+                        }`}
+                    >
                       <span className="text-[10px] text-neutral-400">Quantidade:</span>
                       <input
                         type="number"
                         min="1"
                         max="200"
+                        disabled={isBoxMultiplied}
                         value={boxMultiplier}
                         onChange={(e) => {
                           const raw = e.target.value;
@@ -1119,55 +1186,30 @@ export default function ModelProperties({
                             setBoxMultiplier(1);
                           }
                         }}
-                        className="w-full h-[27px] bg-transparent text-white outline-none font-mono text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        className="w-full h-[27px] bg-transparent text-white outline-none font-mono text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:cursor-not-allowed"
                       />
                     </div>
                     <button
                       type="button"
+                      disabled={isBoxMultiplied}
                       onClick={() =>
                         onMultiplyColumns?.(
                           item.id,
                           Math.max(1, Number(boxMultiplier) || 1),
                         )
                       }
-                      className="bg-primary-300 h-[27px] rounded px-2 text-black buttonHover"
+                      title={
+                        isBoxMultiplied
+                          ? "Este conjunto de caixas já foi multiplicado"
+                          : "Multiplicar colunas"
+                      }
+                      className={`h-[27px] rounded px-2 text-xs font-medium ${isBoxMultiplied
+                          ? "bg-neutral-800 text-neutral-500 opacity-40 cursor-not-allowed border border-white/[0.04]"
+                          : "bg-primary-300 text-black buttonHover"
+                        }`}
                     >
                       Multiplicar
                     </button>
-                  </div>
-
-                  {/* Conexões Laterais da Coluna Atual */}
-                  <div className="grid grid-cols-2 gap-1.5 mt-0.5">
-                    <label className="flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20 hover:bg-white/[0.04] cursor-pointer group">
-                      <span className="text-[10px] text-white/60 group-hover:text-white font-mono">
-                        Conexão Esq.
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(item.props.connectedLeft)}
-                        onChange={(e) =>
-                          onUpdateProps(item.id, {
-                            connectedLeft: e.target.checked,
-                          })
-                        }
-                        className="w-3.5 h-3.5 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300"
-                      />
-                    </label>
-                    <label className="flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20 hover:bg-white/[0.04] cursor-pointer group">
-                      <span className="text-[10px] text-white/60 group-hover:text-white font-mono">
-                        Conexão Dir.
-                      </span>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(item.props.connectedRight)}
-                        onChange={(e) =>
-                          onUpdateProps(item.id, {
-                            connectedRight: e.target.checked,
-                          })
-                        }
-                        className="w-3.5 h-3.5 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300"
-                      />
-                    </label>
                   </div>
                 </div>
 
@@ -1364,8 +1406,8 @@ export default function ModelProperties({
                     title={c.name}
                     onClick={() => onUpdateProps(item.id, { color: c.hex })}
                     className={`w-5 h-5 rounded border ${(item.props.color || "#26272B") === c.hex
-                        ? "border-white ring-1 ring-white"
-                        : "border-white/20 hover:border-white/60"
+                      ? "border-white ring-1 ring-white"
+                      : "border-white/20 hover:border-white/60"
                       }`}
                     style={{ backgroundColor: c.hex }}
                   />
@@ -1383,18 +1425,26 @@ export default function ModelProperties({
                   Multiplicar Colunas
                 </span>
                 <span className="text-[11px] font-mono text-neutral-400">
-                  {drawerMultiplier ? `${drawerMultiplier} colunas (${drawerMultiplier * 5} gavetas)` : ""}
+                  {isDrawerMultiplied
+                    ? "Já multiplicado"
+                    : drawerMultiplier
+                      ? `${drawerMultiplier} colunas (${drawerMultiplier * 5} gavetas)`
+                      : ""}
                 </span>
               </div>
 
               {/* Multiplicação Customizada */}
               <div className="flex items-center space-x-2">
-                <div className="flex items-center bg-[#121214] border border-white/[0.08] rounded-md px-2 text-[11px] w-full">
+                <div
+                  className={`flex items-center bg-[#121214] border border-white/[0.08] rounded-md px-2 text-[11px] w-full  ${isDrawerMultiplied ? "opacity-35 cursor-not-allowed" : ""
+                    }`}
+                >
                   <span className="text-[10px] text-neutral-400">Quantidade:</span>
                   <input
                     type="number"
                     min="1"
                     max="100"
+                    disabled={isDrawerMultiplied}
                     value={drawerMultiplier}
                     onChange={(e) => {
                       const raw = e.target.value;
@@ -1412,18 +1462,27 @@ export default function ModelProperties({
                         setDrawerMultiplier(1);
                       }
                     }}
-                    className="w-full h-[27px] bg-transparent text-white outline-none font-mono text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full h-[27px] bg-transparent text-white outline-none font-mono text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none disabled:cursor-not-allowed"
                   />
                 </div>
                 <button
                   type="button"
+                  disabled={isDrawerMultiplied}
                   onClick={() =>
                     onMultiplyColumns?.(
                       item.id,
                       Math.max(1, Number(drawerMultiplier) || 1),
                     )
                   }
-                  className="bg-primary-300 h-[27px] rounded px-2 text-black buttonHover"
+                  title={
+                    isDrawerMultiplied
+                      ? "Esta estante já foi multiplicada"
+                      : "Multiplicar colunas"
+                  }
+                  className={`h-[27px] rounded px-2 text-xs font-medium  ${isDrawerMultiplied
+                      ? "bg-neutral-800 text-neutral-500 opacity-40 cursor-not-allowed border border-white/[0.04]"
+                      : "bg-primary-300 text-black buttonHover"
+                    }`}
                 >
                   Multiplicar
                 </button>
@@ -1497,9 +1556,9 @@ export default function ModelProperties({
                     onClick={() => {
                       setDrawerDividersInput(opt.qty);
                     }}
-                    className={`flex-1 py-1 rounded border text-[10px] font-mono transition-colors cursor-pointer ${Number(drawerDividersInput) === opt.qty
-                        ? "bg-white/[0.12] border-white/40 text-white font-medium"
-                        : "bg-[#121214] border-white/[0.06] text-white/50 hover:text-white/80"
+                    className={`flex-1 py-1 rounded border text-[10px] font-mono cursor-pointer ${Number(drawerDividersInput) === opt.qty
+                      ? "bg-white/[0.12] border-white/40 text-white font-medium"
+                      : "bg-[#121214] border-white/[0.06] text-white/50 hover:text-white/80"
                       }`}
                   >
                     {opt.label}

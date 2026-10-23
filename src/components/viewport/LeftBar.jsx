@@ -77,17 +77,16 @@ export function isModelResizable(item) {
 
 /* ─── Helpers Visuais ─── */
 const getToolbarBtnClass = (isActive) =>
-  `relative rounded w-[32px] h-[32px] cursor-pointer flex items-center justify-center  ${
-    isActive
-      ? "bg-neutral-600/70 text-primary-300"
-      : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300"
+  `relative rounded w-[32px] h-[32px] cursor-pointer flex items-center justify-center  ${isActive
+    ? "bg-neutral-600/70 text-primary-300"
+    : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300"
   }`;
 
 /* ─── Subcomponente: ItemPalette (Popover) ─── */
 export function ItemPalette({
   isOpen = false,
-  onClose = () => {},
-  onAddItem = () => {},
+  onClose = () => { },
+  onAddItem = () => { },
   triggerRef,
 }) {
   const menuRef = useRef(null);
@@ -166,6 +165,7 @@ export default function LeftBar({
   selectedItem = null,
   selectedItems = [],
   onJoinModels,
+  onDelete,
 }) {
   const [internalIsOpen, setInternalIsOpen] = useState(false);
   const triggerRef = useRef(null);
@@ -174,8 +174,8 @@ export default function LeftBar({
     selectedItems && selectedItems.length > 0
       ? selectedItems
       : selectedItem
-      ? [selectedItem]
-      : [];
+        ? [selectedItem]
+        : [];
   const canResize =
     activeItems.length > 0 && activeItems.every((it) => isModelResizable(it));
 
@@ -189,6 +189,16 @@ export default function LeftBar({
     joinTitle = "Juntar modelos - Selecione outro modelo (Shift+Clique) para juntar";
   } else if (!canJoin) {
     joinTitle = "Juntar modelos - Apenas modelos que permitem alterar tamanho podem ser unidos";
+  }
+
+  const canDelete = activeItems.length > 0;
+  let deleteTitle = "Deletar modelo(s) selecionado(s) (Del / X)";
+  if (!canDelete) {
+    deleteTitle = "Deletar modelo - Selecione um modelo para deletar";
+  } else if (activeItems.length === 1) {
+    deleteTitle = `Deletar ${activeItems[0].name || "modelo"} (Del / X)`;
+  } else {
+    deleteTitle = `Deletar ${activeItems.length} modelos selecionados (Del / X)`;
   }
 
   const isAddMenuOpen =
@@ -235,13 +245,12 @@ export default function LeftBar({
                 setTransformMode?.(tool.mode);
               }}
               title={btnTitle}
-              className={`relative rounded w-[32px] h-[32px] flex items-center justify-center ${
-                isDisabled
+              className={`relative rounded w-[32px] h-[32px] flex items-center justify-center ${isDisabled
                   ? "opacity-70 cursor-not-allowed text-neutral-500"
                   : transformMode === tool.mode
-                  ? "bg-neutral-600/70 text-primary-300 cursor-pointer"
-                  : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300 cursor-pointer"
-              }`}
+                    ? "bg-neutral-600/70 text-primary-300 cursor-pointer"
+                    : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300 cursor-pointer"
+                }`}
             >
               <Icon icon={tool.icon} className={tool.iconClass} />
             </button>
@@ -281,13 +290,30 @@ export default function LeftBar({
             }
           }}
           title={joinTitle}
-          className={`relative rounded w-[32px] h-[32px] flex items-center justify-center transition-all ${
-            !canJoin
+          className={`relative rounded w-[32px] h-[32px] flex items-center justify-center ${!canJoin
               ? "opacity-70 cursor-not-allowed text-neutral-500"
               : "text-neutral-300 hover:bg-neutral-600/70 hover:text-primary-300 cursor-pointer"
-          }`}
+            }`}
         >
           <Icon icon="iconoven:blend-mode" className="text-[22px]" />
+        </button>
+
+        <button
+          type="button"
+          disabled={!canDelete}
+          onClick={() => {
+            if (canDelete) {
+              onDelete?.();
+            }
+          }}
+          title={deleteTitle}
+          className={`relative rounded w-[32px] h-[32px] flex items-center justify-center ${
+            !canDelete
+              ? "opacity-70 cursor-not-allowed text-neutral-500"
+              : "text-neutral-300 hover:bg-neutral-600/70 hover:text-red-400 cursor-pointer"
+          }`}
+        >
+          <Icon icon="carbon:trash-can" className="text-[19px]" />
         </button>
       </div>
 

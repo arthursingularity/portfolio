@@ -5,11 +5,18 @@ import * as THREE from "three";
 import { mergeGeometries, mergeVertices } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 // Dimensões base de referência (em metros)
-const BASE_DIMENSIONS = {
+export const BASE_DIMENSIONS = {
   width: 0.36,
   depth: 0.44,
   height: 0.19, // Altura original: 190mm
 };
+
+// Distância fixa (gap) entre as colunas de gavetas ao multiplicar (em metros)
+// Aceita valores positivos, zero ou negativos:
+//   > 0  -> Afastamento / folga entre colunas (ex: 0.01 para 1cm)
+//     0  -> Encostadas perfeitamente lado a lado
+//   < 0  -> Mais próximas / fundindo os tubos metálicos (ex: -0.0216 para fundir as colunas)
+export const GAVETAS_GAP = -0.02;
 
 // Dimensões das divisórias de madeira (em metros)
 // Altere estes valores facilmente para ajustar o tamanho das placas de madeira:

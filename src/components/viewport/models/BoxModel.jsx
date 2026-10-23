@@ -30,6 +30,8 @@ export default function BoxModel({
   trilho = false,
   varal = false,
   showVaral = false,
+  doubleRail = false,
+  trilhoDuplo = false,
   connectedLeft = false,
   connectedRight = false,
   boxColor = DEFAULT_BOX_COLOR,
@@ -44,6 +46,7 @@ export default function BoxModel({
 }) {
   const hasRail = Boolean(rail || trilho);
   const hasVaral = Boolean(hasRail && (varal || showVaral));
+  const isDoubleRail = Boolean(doubleRail || trilhoDuplo);
   const railH = 0.070;
   const baseY = hasRail ? railH : 0;
 
@@ -56,10 +59,7 @@ export default function BoxModel({
   const safeCount = Math.min(6, Math.max(0, targetCount));
 
   // Instância fallback única caso nenhum ID ou seed seja passado
-  const instanceSeed = useMemo(
-    () => Math.floor(Math.random() * 1000000) + 1,
-    []
-  );
+  const instanceSeed = 12345;
 
   // Semente única calculada para este modelo específico
   const seedBase = useMemo(() => {
@@ -88,6 +88,23 @@ export default function BoxModel({
       return createBoxMaterial(hex, seedBase, tierIdx, wireframe);
     });
   }, [safeCount, boxColors, selectedColors, boxColor, wireframe, seedBase]);
+
+  // Materiais das caixas da 2ª fileira (Trilho Duplo) com sutil variação tonal realista
+  const tierMaterialsRow2 = useMemo(() => {
+    if (!isDoubleRail) return [];
+    return Array.from({ length: safeCount }).map((_, tierIdx) => {
+      let hex = DEFAULT_BOX_COLOR;
+      if (Array.isArray(boxColors) && boxColors[tierIdx]) {
+        hex = boxColors[tierIdx];
+      } else if (Array.isArray(selectedColors) && selectedColors.length > 0) {
+        hex = selectedColors[tierIdx % selectedColors.length];
+      } else if (boxColor) {
+        hex = boxColor;
+      }
+
+      return createBoxMaterial(hex, seedBase, tierIdx + 12, wireframe);
+    });
+  }, [isDoubleRail, safeCount, boxColors, selectedColors, boxColor, wireframe, seedBase]);
 
   // Materiais do trilho metálico laranja de base e varal
   const railMaterials = useMemo(
@@ -140,8 +157,15 @@ export default function BoxModel({
 
   const railW = crateW + bridgeLeft + bridgeRight;
   const railCenterX = (bridgeRight - bridgeLeft) / 2;
-  const railD = hasVaral ? crateD + postD : crateD;
-  const railCenterZ = hasVaral ? -postD / 2 : 0;
+
+  // Dimensões em Z considerando se é Trilho Duplo (+1 fileira em profundidade)
+  const GAP_Z = 0.004; // Espaçamento de 4mm entre fileiras para corte visual nítido
+  const row2OffsetZ = crateD + GAP_Z;
+  const effectiveCrateD = isDoubleRail ? 2 * crateD + GAP_Z : crateD;
+  const baseCenterZ = isDoubleRail ? (crateD + GAP_Z) / 2 : 0;
+
+  const railD = hasVaral ? effectiveCrateD + postD : effectiveCrateD;
+  const railCenterZ = baseCenterZ + (hasVaral ? -postD / 2 : 0);
 
   // Geometria e alturas do Varal (dimensionado para a altura máxima de 6 caixas)
   const maxBoxes = 6;
@@ -263,22 +287,39 @@ export default function BoxModel({
         />
       )}
 
-      {/* ── 3. Coluna de Caixas compartilhando a mesma geometria (Zero GC / Instância limpa) ── */}
+      {/* ── 3. Coluna(s) de Caixas compartilhando a mesma geometria (Zero GC / Instância limpa) ── */}
       {safeCount > 0 && (
         <group position={[0, baseY, 0]}>
+          {/* Fileira 1 (Traseira - padrão) */}
           {Array.from({ length: safeCount }).map((_, tierIdx) => {
             const crateY = (tierIdx + 0.5) * crateH + tierIdx * GAP_Y;
             const crateMat = tierMaterials[tierIdx];
 
             return (
               <mesh
-                key={tierIdx}
+                key={`row1-${tierIdx}`}
                 geometry={crateGeo}
                 material={crateMat}
                 position={[0, crateY, 0]}
               />
             );
           })}
+
+          {/* Fileira 2 (Frontal - Trilho Duplo visual) */}
+          {isDoubleRail &&
+            Array.from({ length: safeCount }).map((_, tierIdx) => {
+              const crateY = (tierIdx + 0.5) * crateH + tierIdx * GAP_Y;
+              const crateMat = tierMaterialsRow2[tierIdx] || tierMaterials[tierIdx];
+
+              return (
+                <mesh
+                  key={`row2-${tierIdx}`}
+                  geometry={crateGeo}
+                  material={crateMat}
+                  position={[0, crateY, row2OffsetZ]}
+                />
+              );
+            })}
         </group>
       )}
     </group>

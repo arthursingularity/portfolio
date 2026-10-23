@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Search } from "@carbon/icons-react";
 import { Icon } from "@iconify/react";
 
@@ -18,10 +18,12 @@ export default function TreeFolderSection({
   selectedId,
   selectedIds = [],
   onSelect,
+  onSelectMultiple,
   onToggleVisibility,
   onDuplicate,
   onUpdateName,
   onUpdateProps,
+  onToggleMainFloor,
   onSave,
   saveStatus = "idle",
   saveMessage = "",
@@ -37,6 +39,23 @@ export default function TreeFolderSection({
   const [expandedDrawers, setExpandedDrawers] = useState({});
   const [editingCompKey, setEditingCompKey] = useState(null);
   const [tempCompName, setTempCompName] = useState("");
+
+  // Estado das pastas de multiplicação (ex: "Trilho 1")
+  const [expandedFolders, setExpandedFolders] = useState({});
+  const [editingFolderId, setEditingFolderId] = useState(null);
+  const [tempFolderName, setTempFolderName] = useState("");
+
+  const treeContainerRef = useRef(null);
+  const lastAnchorIdRef = useRef(null);
+  const isShiftSelectingRef = useRef(false);
+
+  // Sincroniza a âncora sempre que selectedId mudar externamente (ex: seleção no Canvas 3D)
+  useEffect(() => {
+    if (selectedId && !isShiftSelectingRef.current) {
+      lastAnchorIdRef.current = selectedId;
+    }
+    isShiftSelectingRef.current = false;
+  }, [selectedId]);
 
   const commitItemName = (id, currentName) => {
     const val = tempItemName.trim();
@@ -58,6 +77,31 @@ export default function TreeFolderSection({
     }));
   };
 
+  const toggleFolderExpanded = (folderId) => {
+    setExpandedFolders((prev) => ({
+      ...prev,
+      [folderId]: prev[folderId] !== undefined ? !prev[folderId] : false,
+    }));
+  };
+
+  const startEditingFolder = (folderId, currentName) => {
+    setEditingFolderId(folderId);
+    setTempFolderName(currentName || "");
+  };
+
+  const commitFolderName = (folderId, currentName, folderItems) => {
+    const val = tempFolderName.trim();
+    if (val && val !== currentName) {
+      const targetItem =
+        (Array.isArray(folderItems) && folderItems[0]) ||
+        items.find((it) => getFolderKey(it) === folderId);
+      if (targetItem) {
+        onUpdateProps?.(targetItem.id, { folderId, folderName: val });
+      }
+    }
+    setEditingFolderId(null);
+  };
+
   const startEditingComp = (itemId, compIdx, currentName) => {
     setEditingCompKey(`${itemId}-${compIdx}`);
     setTempCompName(currentName || "");
@@ -74,6 +118,40 @@ export default function TreeFolderSection({
     setEditingCompKey(null);
   };
 
+  // Helper para identificar chave de agrupamento em pasta de multiplicação
+  const getFolderKey = useCallback((item) => {
+    if (item.folderId || item.props?.folderId) {
+      return item.folderId || item.props?.folderId;
+    }
+    if (item.isMultiplied && (item.groupId || item.props?.groupId)) {
+      return `folder_${item.groupId || item.props?.groupId}`;
+    }
+    return null;
+  }, []);
+
+  // Mapeia nomes das pastas (ex: "Trilho 1", "Prateleira G 1")
+  const folderNamesMap = useMemo(() => {
+    const map = new Map();
+    let railCounter = 1;
+    let shelfCounter = 1;
+    items.forEach((it) => {
+      const fKey = getFolderKey(it);
+      if (fKey && !map.has(fKey)) {
+        const explicitName = it.folderName || it.props?.folderName;
+        if (explicitName) {
+          map.set(fKey, explicitName);
+        } else {
+          if (it.type === "drawer_g") {
+            map.set(fKey, `Prateleira G ${shelfCounter++}`);
+          } else {
+            map.set(fKey, `Trilho ${railCounter++}`);
+          }
+        }
+      }
+    });
+    return map;
+  }, [items, getFolderKey]);
+
   // Filter items by search query
   const filteredItems = useMemo(() => {
     if (!searchQuery.trim()) return items;
@@ -84,6 +162,173 @@ export default function TreeFolderSection({
         it.type?.toLowerCase().includes(q),
     );
   }, [items, searchQuery]);
+
+  // Agrupa os itens em nós de pasta e itens soltos
+  const treeNodes = useMemo(() => {
+    const nodes = [];
+    const seenFolders = new Map();
+
+    filteredItems.forEach((item) => {
+      const folderKey = getFolderKey(item);
+      if (folderKey) {
+        if (!seenFolders.has(folderKey)) {
+          const folderNode = {
+            type: "folder",
+            id: folderKey,
+            name:
+              item.folderName ||
+              item.props?.folderName ||
+              folderNamesMap.get(folderKey) ||
+              (item.type === "drawer_g" ? "Prateleira G 1" : "Trilho 1"),
+            items: [item],
+          };
+          seenFolders.set(folderKey, folderNode);
+          nodes.push(folderNode);
+        } else {
+          seenFolders.get(folderKey).items.push(item);
+        }
+      } else {
+        nodes.push({
+          type: "item",
+          id: item.id,
+          item,
+        });
+      }
+    });
+
+    return nodes;
+  }, [filteredItems, folderNamesMap, getFolderKey]);
+
+  // Auto-scroll: quando o usuário seleciona um modelo (no 3D ou na lista),
+  // se o item não estiver visível na árvore, abre a pasta se necessário e rola suavemente até ele.
+  useEffect(() => {
+    if (!selectedId) return;
+
+    // Se o item selecionado pertencer a uma pasta recolhida, expande a pasta
+    const targetItem = items.find((it) => it.id === selectedId);
+    const folderKey = targetItem ? getFolderKey(targetItem) : null;
+    if (folderKey) {
+      setExpandedFolders((prev) => {
+        if (prev[folderKey] === false) {
+          return { ...prev, [folderKey]: true };
+        }
+        return prev;
+      });
+    }
+
+    const timer = setTimeout(() => {
+      setCollectionExpanded((prev) => (prev ? prev : true));
+
+      const container = treeContainerRef.current;
+      if (!container) return;
+
+      const el = container.querySelector(`[data-tree-item-id="${selectedId}"]`);
+      if (!el) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+
+      const isAbove = elRect.top < containerRect.top + 2;
+      const isBelow = elRect.bottom > containerRect.bottom - 2;
+
+      if (isAbove || isBelow) {
+        el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }, 40);
+
+    return () => clearTimeout(timer);
+  }, [selectedId, items, getFolderKey]);
+
+  // Manipulador de clique nos itens: suporta clique simples, Ctrl (toggle) e SHIFT (seleção em intervalo)
+  const handleItemClick = (e, clickedId) => {
+    if (e.shiftKey) {
+      e.preventDefault();
+      isShiftSelectingRef.current = true;
+
+      // Ponto de partida (âncora) do intervalo
+      const anchorId =
+        lastAnchorIdRef.current &&
+        filteredItems.some((it) => it.id === lastAnchorIdRef.current)
+          ? lastAnchorIdRef.current
+          : selectedId && filteredItems.some((it) => it.id === selectedId)
+          ? selectedId
+          : null;
+
+      if (!anchorId) {
+        lastAnchorIdRef.current = clickedId;
+        if (onSelectMultiple) {
+          onSelectMultiple([clickedId]);
+        } else {
+          onSelect?.(clickedId, false);
+        }
+        return;
+      }
+
+      const fromIndex = filteredItems.findIndex((it) => it.id === anchorId);
+      const toIndex = filteredItems.findIndex((it) => it.id === clickedId);
+
+      if (fromIndex !== -1 && toIndex !== -1) {
+        const start = Math.min(fromIndex, toIndex);
+        const end = Math.max(fromIndex, toIndex);
+        const rangeIds = filteredItems.slice(start, end + 1).map((it) => it.id);
+
+        if (onSelectMultiple) {
+          onSelectMultiple(rangeIds);
+        } else if (onSelect) {
+          onSelect(rangeIds);
+        }
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      lastAnchorIdRef.current = clickedId;
+      onSelect?.(clickedId, true);
+    } else {
+      lastAnchorIdRef.current = clickedId;
+      if (onSelectMultiple) {
+        onSelectMultiple([clickedId]);
+      } else {
+        onSelect?.(clickedId, false);
+      }
+    }
+  };
+
+  // Manipulação de seleção e visibilidade da pasta inteira
+  const handleFolderClick = (e, folderNode) => {
+    const folderItemIds = folderNode.items.map((it) => it.id);
+    if (e.shiftKey) {
+      e.preventDefault();
+      const nextSelection = Array.from(
+        new Set([...(selectedIds || []), ...folderItemIds])
+      );
+      if (onSelectMultiple) {
+        onSelectMultiple(nextSelection);
+      } else if (onSelect) {
+        onSelect(nextSelection);
+      }
+    } else if (e.ctrlKey || e.metaKey) {
+      const allSelected = folderItemIds.every((id) =>
+        selectedIds?.includes(id)
+      );
+      const nextSelection = allSelected
+        ? (selectedIds || []).filter((id) => !folderItemIds.includes(id))
+        : Array.from(new Set([...(selectedIds || []), ...folderItemIds]));
+      if (onSelectMultiple) {
+        onSelectMultiple(nextSelection);
+      } else if (onSelect) {
+        onSelect(nextSelection);
+      }
+    } else {
+      if (onSelectMultiple) {
+        onSelectMultiple(folderItemIds);
+      } else if (onSelect) {
+        onSelect(folderItemIds);
+      }
+    }
+  };
+
+  const toggleFolderVisibility = (folderNode) => {
+    const folderItemIds = folderNode.items.map((it) => it.id);
+    onToggleVisibility?.(folderItemIds);
+  };
 
   // Ícone contextual dos objetos (Blender Theme)
   const getItemIcon = (type) => {
@@ -105,6 +350,259 @@ export default function TreeFolderSection({
       default:
         return <Icon icon="at-icons:cube" className="text-[14px] text-neutral-400" />;
     }
+  };
+
+  // Renderiza uma linha individual de modelo (reutilizada para itens soltos e itens dentro de pastas)
+  const renderItem = (item, isInsideFolder = false) => {
+    const isSelected =
+      selectedIds && selectedIds.length > 0
+        ? selectedIds.includes(item.id)
+        : item.id === selectedId;
+    const isHidden = item.hidden;
+    const hasCompartments =
+      item.type === "drawer_g" &&
+      Array.isArray(item.props?.compartments) &&
+      item.props.compartments.length > 0;
+    const isDrawerExpanded = expandedDrawers[item.id] !== false;
+    const isMainFloor =
+      item.type === "floor" &&
+      Boolean(item.isMainFloor || item.props?.isMain || item.props?.isMainFloor);
+
+    return (
+      <React.Fragment key={item.id}>
+        <div
+          data-tree-item-id={item.id}
+          onClick={(e) => handleItemClick(e, item.id)}
+          className={`group flex items-center justify-between ${
+            isInsideFolder ? "pl-7" : "pl-3.5"
+          } pr-2.5 py-1 cursor-pointer border-l-2 select-none ${
+            isSelected
+              ? "bg-[#284968] text-white border-blue-400"
+              : "hover:bg-white/[0.06] text-white/70 border-transparent"
+          }`}
+        >
+          {/* Item icon and name */}
+          <div className="flex items-center gap-1.5 min-w-0 flex-1 pl-0.5">
+            {hasCompartments ? (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  toggleDrawerExpanded(item.id);
+                }}
+                className="p-0.5 text-white/50 hover:text-white cursor-pointer"
+                title={isDrawerExpanded ? "Recolher vagas" : "Expandir vagas"}
+              >
+                <Icon
+                  icon={
+                    isDrawerExpanded
+                      ? "akar-icons:chevron-down"
+                      : "akar-icons:chevron-right"
+                  }
+                  className="text-[10px]"
+                />
+              </button>
+            ) : (
+              <span className="w-3" />
+            )}
+
+            {getItemIcon(item.type)}
+            {editingItemId === item.id ? (
+              <input
+                type="text"
+                value={tempItemName}
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setTempItemName(e.target.value)}
+                onBlur={() => commitItemName(item.id, item.name)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    commitItemName(item.id, item.name);
+                  } else if (e.key === "Escape") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    setEditingItemId(null);
+                  }
+                }}
+                className="bg-black/90 border border-blue-400 rounded px-1.5 py-0.5 text-[11px] text-white outline-none w-full font-medium"
+              />
+            ) : (
+              <span
+                onDoubleClick={(e) => {
+                  e.stopPropagation();
+                  startEditing(item.id, item.name);
+                }}
+                title="Clique duas vezes para renomear"
+                className={`truncate text-[11px] cursor-pointer hover:underline ${
+                  isHidden
+                    ? "opacity-50"
+                    : isSelected
+                    ? "font-medium text-white"
+                    : "text-white/80"
+                }`}
+              >
+                {item.name}
+              </span>
+            )}
+          </div>
+
+          {/* Quick Actions (Main Floor, Rename & Eye toggle visibility) */}
+          <div
+            className={`flex items-center gap-1 shrink-0 ${
+              isMainFloor ? "opacity-100" : "opacity-70"
+            } group-hover:opacity-100`}
+          >
+            {/* Botão de Piso Principal (Apenas nos modelos 'Piso', antes do ícone de lápis) */}
+            {item.type === "floor" && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onToggleMainFloor?.(item.id);
+                }}
+                className={`p-1 rounded hover:bg-white/20 cursor-pointer ${
+                  isMainFloor
+                    ? "text-primary-300 opacity-100"
+                    : "text-white/50 hover:text-white"
+                }`}
+                title={
+                  isMainFloor
+                    ? "Piso principal ativo (novos modelos serão gerados sobre este piso)"
+                    : "Definir como piso principal"
+                }
+              >
+                <Icon
+                  icon={
+                    isMainFloor
+                      ? "reicon:main-component-filled"
+                      : "reicon:main-component"
+                  }
+                  className={`text-[14px] ${isMainFloor ? "text-primary-300" : ""}`}
+                />
+              </button>
+            )}
+
+            {/* Botão de Renomear */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                startEditing(item.id, item.name);
+              }}
+              className="p-1 rounded hover:bg-white/20 text-white/50 hover:text-white cursor-pointer"
+              title="Renomear modelo"
+            >
+              <Icon icon="lucide:pencil" className="text-[11px]" />
+            </button>
+
+            {/* Toggle 3D Visibility */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleVisibility(item.id);
+              }}
+              className={`p-0.5 rounded hover:bg-white/20 cursor-pointer ${
+                isHidden
+                  ? "text-red-400"
+                  : isSelected
+                  ? "text-white"
+                  : "text-white/50 hover:text-white"
+              }`}
+              title={isHidden ? "Exibir modelo no 3D" : "Ocultar modelo no 3D"}
+            >
+              <Icon
+                icon={isHidden ? "carbon:view-off" : "carbon:view"}
+                className="text-[15px]"
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Sub-vagas aninhadas da gaveta com divisórias */}
+        {hasCompartments && isDrawerExpanded && (
+          <div
+            className={`flex flex-col border-l border-white/[0.08] ${
+              isInsideFolder ? "ml-13" : "ml-10"
+            } my-0.5`}
+          >
+            {item.props.compartments.map((comp, cIdx) => (
+              <div
+                key={comp.id || cIdx}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelect(item.id);
+                }}
+                className="group/comp flex items-center justify-between pl-3 pr-2.5 py-0.5 hover:bg-white/[0.04] text-white/70 hover:text-white cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                  <Icon
+                    icon="lucide:inbox"
+                    className="text-[14px] text-amber-400/80 shrink-0"
+                  />
+                  <span className="text-[11px] text-neutral-400 shrink-0">
+                    {comp.label.split(" ")[0]}{" "}
+                    {comp.label.includes("(")
+                      ? comp.label.slice(comp.label.indexOf("("))
+                      : ""}
+                    :
+                  </span>
+                  {editingCompKey === `${item.id}-${cIdx}` ? (
+                    <input
+                      type="text"
+                      value={tempCompName}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                      onFocus={(e) => e.target.select()}
+                      onChange={(e) => setTempCompName(e.target.value)}
+                      onBlur={() => commitCompName(item, cIdx)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          commitCompName(item, cIdx);
+                        } else if (e.key === "Escape") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setEditingCompKey(null);
+                        }
+                      }}
+                      className="bg-black/90 border border-amber-400/80 rounded px-1 py-0 text-[11px] text-white outline-none w-full font-medium"
+                    />
+                  ) : (
+                    <span
+                      onDoubleClick={(e) => {
+                        e.stopPropagation();
+                        startEditingComp(item.id, cIdx, comp.name);
+                      }}
+                      title="Clique duas vezes para renomear produto"
+                      className="truncate text-[11px] text-white/80 hover:underline"
+                    >
+                      {comp.name || `D${cIdx + 1}`}
+                    </span>
+                  )}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startEditingComp(item.id, cIdx, comp.name);
+                  }}
+                  className="opacity-0 group-hover/comp:opacity-100 p-0.5 rounded hover:bg-white/20 text-white/40 hover:text-white"
+                  title="Renomear produto"
+                >
+                  <Icon icon="lucide:pencil" className="text-[10px]" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </React.Fragment>
+    );
   };
 
   return (
@@ -132,83 +630,73 @@ export default function TreeFolderSection({
         </div>
 
         {/* Tree View (Blender Scene Collection) */}
-        <div className="flex-1 min-h-0 overflow-y-auto text-[11px] py-1">
-          {/* Root: Scene Collection */}
-          <div className="flex items-center gap-1.5 px-2.5 py-1 text-white/60">
-            <Icon
-              icon={"ant-design:folder-filled"}
-              className="text-blue-400 text-[17px] shrink-0"
-            />
-            {isEditingName ? (
-              <input
-                type="text"
-                value={tempName}
-                autoFocus
-                onChange={(e) => setTempName(e.target.value)}
-                onBlur={() => {
-                  const val = tempName.trim() || "setor_principal";
-                  setProjectName(val);
-                  setIsEditingName(false);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+        <div
+          ref={treeContainerRef}
+          className="flex-1 min-h-0 overflow-y-auto text-[11px] py-1 select-none"
+        >
+          {/* Root: Arquivo .glb como Pasta Principal */}
+          <div className="flex items-center justify-between px-2.5 py-1 text-white/70 hover:bg-white/[0.03]">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => setCollectionExpanded(!collectionExpanded)}
+                className="p-0.5 text-white/50 hover:text-white cursor-pointer"
+                title={collectionExpanded ? "Recolher" : "Expandir"}
+              >
+                <Icon
+                  icon={
+                    collectionExpanded
+                      ? "akar-icons:chevron-down"
+                      : "akar-icons:chevron-right"
+                  }
+                  className="text-white text-[13px]"
+                />
+              </button>
+              <Icon
+                icon={
+                  collectionExpanded
+                    ? "ant-design:folder-open-filled"
+                    : "ant-design:folder-filled"
+                }
+                className="text-blue-400 text-[17px] shrink-0 cursor-pointer"
+                onClick={() => setCollectionExpanded(!collectionExpanded)}
+              />
+              {isEditingName ? (
+                <input
+                  type="text"
+                  value={tempName}
+                  autoFocus
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => setTempName(e.target.value)}
+                  onBlur={() => {
                     const val = tempName.trim() || "setor_principal";
                     setProjectName(val);
                     setIsEditingName(false);
-                  } else if (e.key === "Escape") {
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      const val = tempName.trim() || "setor_principal";
+                      setProjectName(val);
+                      setIsEditingName(false);
+                    } else if (e.key === "Escape") {
+                      setTempName(projectName);
+                      setIsEditingName(false);
+                    }
+                  }}
+                  className="bg-black/60 border border-blue-400/50 rounded px-1 py-0.5 text-[11px] text-white outline-none w-full"
+                />
+              ) : (
+                <span
+                  onClick={() => {
                     setTempName(projectName);
-                    setIsEditingName(false);
-                  }
-                }}
-                className="bg-black/60 border border-blue-400/50 rounded px-1 py-0.5 text-[11px] text-white outline-none w-full"
-              />
-            ) : (
-              <span
-                onClick={() => {
-                  setTempName(projectName);
-                  setIsEditingName(true);
-                }}
-                title="Clique para renomear"
-                className="font-medium text-white/80 text-[11px] cursor-pointer hover:text-white truncate"
-              >
-                {projectName ? `${projectName}.glb` : "setor_principal.glb"}
-              </span>
-            )}
-          </div>
-
-          {/* Sub: Collection (Setor) */}
-          <div className="flex items-center justify-between px-4 py-1 text-white/50 hover:bg-white/[0.03]">
-            <div
-              className="flex items-center gap-1.5 cursor-pointer"
-              onClick={() => setCollectionExpanded(!collectionExpanded)}
-            >
-              {collectionExpanded ? (
-                <Icon
-                  icon={"akar-icons:chevron-right"}
-                  className="text-white text-[13px]"
-                />
-              ) : (
-                <Icon
-                  icon={"akar-icons:chevron-down"}
-                  className="text-white text-[13px]"
-                />
+                    setIsEditingName(true);
+                  }}
+                  title="Clique para renomear"
+                  className="font-medium text-white/90 text-[11px] cursor-pointer hover:text-white truncate"
+                >
+                  {projectName ? `${projectName}.glb` : "setor_principal.glb"}
+                </span>
               )}
-              {collectionExpanded ? (
-                <Icon
-                  icon={"ant-design:folder-open-filled"}
-                  className="text-blue-400 text-[17px]"
-                />
-              ) : (
-                <Icon
-                  icon={"ant-design:folder-filled"}
-                  className="text-blue-400 text-[17px]"
-                />
-              )}
-              <span
-                className={`${collectionExpanded ? "text-white" : "text-white/70"}`}
-              >
-                Setor Principal
-              </span>
             </div>
           </div>
 
@@ -222,219 +710,147 @@ export default function TreeFolderSection({
                     : "Nenhum objeto na cena. Adicione pelo menu à esquerda."}
                 </div>
               ) : (
-                filteredItems.map((item) => {
-                  const isSelected =
-                    selectedIds && selectedIds.length > 0
-                      ? selectedIds.includes(item.id)
-                      : item.id === selectedId;
-                  const isHidden = item.hidden;
-                  const hasCompartments =
-                    item.type === "drawer_g" &&
-                    Array.isArray(item.props?.compartments) &&
-                    item.props.compartments.length > 0;
-                  const isDrawerExpanded = expandedDrawers[item.id] !== false;
+                treeNodes.map((node) => {
+                  if (node.type === "item") {
+                    return renderItem(node.item, false);
+                  }
+
+                  const isFolderExpanded = expandedFolders[node.id] !== false;
+                  const folderItemIds = node.items.map((it) => it.id);
+                  const isAllSelected =
+                    folderItemIds.length > 0 &&
+                    folderItemIds.every((id) => selectedIds?.includes(id));
+                  const isAnySelected =
+                    !isAllSelected &&
+                    folderItemIds.some(
+                      (id) => selectedIds?.includes(id) || id === selectedId
+                    );
+                  const allHidden =
+                    node.items.length > 0 && node.items.every((it) => it.hidden);
 
                   return (
-                    <React.Fragment key={item.id}>
+                    <React.Fragment key={node.id}>
                       <div
-                        onClick={(e) =>
-                          onSelect(item.id, e.shiftKey || e.ctrlKey || e.metaKey)
-                        }
-                        className={`group flex items-center justify-between pl-6 pr-2.5 py-1 cursor-pointer border-l-2 ${
-                          isSelected
+                        onClick={(e) => handleFolderClick(e, node)}
+                        className={`group flex items-center justify-between pl-3.5 pr-2.5 py-1 cursor-pointer border-l-2 select-none ${
+                          isAllSelected
                             ? "bg-[#284968] text-white border-blue-400"
-                            : "hover:bg-white/[0.06] text-white/70 border-transparent"
+                            : isAnySelected
+                            ? "bg-blue-500/10 text-white/90 border-blue-400/50"
+                            : "hover:bg-white/[0.06] text-white/80 border-transparent"
                         }`}
                       >
-                        {/* Item icon and name */}
                         <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                          {hasCompartments ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleDrawerExpanded(item.id);
-                              }}
-                              className="p-0.5 text-white/50 hover:text-white cursor-pointer"
-                              title={isDrawerExpanded ? "Recolher vagas" : "Expandir vagas"}
-                            >
-                              <Icon
-                                icon={
-                                  isDrawerExpanded
-                                    ? "akar-icons:chevron-down"
-                                    : "akar-icons:chevron-right"
-                                }
-                                className="text-[10px]"
-                              />
-                            </button>
-                          ) : (
-                            <span className="w-3" />
-                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleFolderExpanded(node.id);
+                            }}
+                            className="pl-3.5 text-white/50 hover:text-white cursor-pointer"
+                            title={isFolderExpanded ? "Recolher pasta" : "Expandir pasta"}
+                          >
+                            <Icon
+                              icon={
+                                isFolderExpanded
+                                  ? "akar-icons:chevron-down"
+                                  : "akar-icons:chevron-right"
+                              }
+                              className="text-[13px]"
+                            />
+                          </button>
 
-                          {getItemIcon(item.type)}
-                          {editingItemId === item.id ? (
+                          <Icon
+                            icon={
+                              isFolderExpanded
+                                ? "ant-design:folder-open-filled"
+                                : "ant-design:folder-filled"
+                            }
+                            className="text-blue-400 text-[17px] shrink-0"
+                          />
+
+                          {editingFolderId === node.id ? (
                             <input
                               type="text"
-                              value={tempItemName}
+                              value={tempFolderName}
                               autoFocus
                               onClick={(e) => e.stopPropagation()}
                               onFocus={(e) => e.target.select()}
-                              onChange={(e) => setTempItemName(e.target.value)}
-                              onBlur={() => commitItemName(item.id, item.name)}
+                              onChange={(e) => setTempFolderName(e.target.value)}
+                              onBlur={() => commitFolderName(node.id, node.name, node.items)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  commitItemName(item.id, item.name);
+                                  commitFolderName(node.id, node.name, node.items);
                                 } else if (e.key === "Escape") {
                                   e.preventDefault();
                                   e.stopPropagation();
-                                  setEditingItemId(null);
+                                  setEditingFolderId(null);
                                 }
                               }}
-                              className="bg-black/90 border border-blue-400 rounded px-1.5 py-0.5 text-[11px] text-white outline-none w-full font-medium"
+                              className="bg-black/60 border border-blue-400/50 rounded px-1 py-0.5 text-[11px] text-white outline-none w-full"
                             />
                           ) : (
                             <span
                               onDoubleClick={(e) => {
                                 e.stopPropagation();
-                                startEditing(item.id, item.name);
+                                startEditingFolder(node.id, node.name);
                               }}
-                              title="Clique duas vezes para renomear"
-                              className={`truncate text-[11px] cursor-pointer hover:underline ${
-                                isHidden
-                                  ? "opacity-50"
-                                  : isSelected
-                                  ? "font-medium text-white"
-                                  : "text-white/80"
-                              }`}
+                              title="Clique duas vezes para renomear a pasta"
+                              className="truncate text-[11px] font-medium text-white/90 hover:underline"
                             >
-                              {item.name}
+                              {node.name}
                             </span>
                           )}
+
+                          <span className="text-[11px] text-white/40 tabular-nums">
+                            ({node.items.length})
+                          </span>
                         </div>
 
-                        {/* Quick Actions (Rename & Eye toggle visibility) */}
-                        <div className="flex items-center gap-1 shrink-0 opacity-70 group-hover:opacity-100">
-                          {/* Botão de Renomear */}
+                        {/* Actions */}
+                        <div className="flex items-center gap-1">
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              startEditing(item.id, item.name);
+                              startEditingFolder(node.id, node.name);
                             }}
-                            className="p-1 rounded hover:bg-white/20 text-white/50 hover:text-white cursor-pointer"
-                            title="Renomear modelo"
+                            className="p-1 rounded hover:bg-white/20 text-white/40 hover:text-white cursor-pointer"
+                            title="Renomear pasta"
                           >
                             <Icon icon="lucide:pencil" className="text-[11px]" />
                           </button>
 
-                          {/* Toggle 3D Visibility */}
                           <button
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onToggleVisibility(item.id);
+                              toggleFolderVisibility(node);
                             }}
                             className={`p-0.5 rounded hover:bg-white/20 cursor-pointer ${
-                              isHidden
-                                ? "text-red-400"
-                                : isSelected
-                                  ? "text-white"
-                                  : "text-white/60 hover:text-white"
+                              allHidden
+                                ? "text-white/30"
+                                : "text-white/70 hover:text-white"
                             }`}
                             title={
-                              isHidden
-                                ? "Objeto oculto (clique para exibir)"
-                                : "Ocultar objeto na cena"
+                              allHidden
+                                ? "Mostrar todos os itens da pasta"
+                                : "Ocultar todos os itens da pasta"
                             }
                           >
-                            {isHidden ? (
-                              <Icon
-                                icon={"carbon:view-off-filled"}
-                                className="text-white text-[15px]"
-                              />
-                            ) : (
-                              <Icon
-                                icon={"carbon:view-filled"}
-                                className="text-white text-[15px]"
-                              />
-                            )}
+                            <Icon
+                              icon={allHidden ? "carbon:view-off" : "carbon:view"}
+                              className="text-[15px]"
+                            />
                           </button>
                         </div>
                       </div>
 
-                      {/* Sub-vagas aninhadas da gaveta com divisórias */}
-                      {hasCompartments && isDrawerExpanded && (
-                        <div className="flex flex-col border-l border-white/[0.08] ml-11 my-0.5">
-                          {item.props.compartments.map((comp, cIdx) => (
-                            <div
-                              key={comp.id || cIdx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onSelect(item.id);
-                              }}
-                              className="group/comp flex items-center justify-between pl-3 pr-2.5 py-0.5 hover:bg-white/[0.04] text-white/70 hover:text-white cursor-pointer"
-                            >
-                              <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                <Icon
-                                  icon="lucide:inbox"
-                                  className="text-[14px] text-amber-400/80 shrink-0"
-                                />
-                                <span className="text-[11px] text-neutral-400 shrink-0">
-                                  {comp.label.split(" ")[0]} {comp.label.includes("(") ? comp.label.slice(comp.label.indexOf("(")) : ""}:
-                                </span>
-                                {editingCompKey === `${item.id}-${cIdx}` ? (
-                                  <input
-                                    type="text"
-                                    value={tempCompName}
-                                    autoFocus
-                                    onClick={(e) => e.stopPropagation()}
-                                    onFocus={(e) => e.target.select()}
-                                    onChange={(e) => setTempCompName(e.target.value)}
-                                    onBlur={() => commitCompName(item, cIdx)}
-                                    onKeyDown={(e) => {
-                                      if (e.key === "Enter") {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        commitCompName(item, cIdx);
-                                      } else if (e.key === "Escape") {
-                                        e.preventDefault();
-                                        e.stopPropagation();
-                                        setEditingCompKey(null);
-                                      }
-                                    }}
-                                    className="bg-black/90 border border-amber-400/80 rounded px-1 py-0 text-[11px] text-white outline-none w-full font-medium"
-                                  />
-                                ) : (
-                                  <span
-                                    onDoubleClick={(e) => {
-                                      e.stopPropagation();
-                                      startEditingComp(item.id, cIdx, comp.name);
-                                    }}
-                                    title="Clique duas vezes para renomear produto"
-                                    className="truncate text-[11px] text-white/80 hover:underline"
-                                  >
-                                    {`D${cIdx + 1}`}
-                                  </span>
-                                )}
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  startEditingComp(item.id, cIdx, comp.name);
-                                }}
-                                className="opacity-0 group-hover/comp:opacity-100 p-0.5 rounded hover:bg-white/20 text-white/40 hover:text-white"
-                                title="Renomear produto"
-                              >
-                                <Icon icon="lucide:pencil" className="text-[10px]" />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                      {/* Folder Children */}
+                      {isFolderExpanded &&
+                        node.items.map((childItem) => renderItem(childItem, true))}
                     </React.Fragment>
                   );
                 })

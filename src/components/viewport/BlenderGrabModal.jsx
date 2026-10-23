@@ -139,15 +139,6 @@ export default function BlenderGrabModal({
             return dx < 0.05 && dz < 0.05;
           });
         }
-        // Fallback: Caixas Brancas conectadas por varal/trilho caso não possuam groupId explícito
-        if (it.type === "box" && (it.props?.rail || it.props?.trilho)) {
-          return rawTargets.some((r) => {
-            if (r.type !== "box") return false;
-            if (!r.props?.rail && !r.props?.trilho) return false;
-            const dy = Math.abs((it.position?.[1] ?? 0) - (r.position?.[1] ?? 0));
-            return dy < 0.05 && (it.props?.connectedLeft || it.props?.connectedRight || r.props?.connectedLeft || r.props?.connectedRight);
-          });
-        }
         return false;
       });
       effectiveTargets = [...rawTargets, ...others];

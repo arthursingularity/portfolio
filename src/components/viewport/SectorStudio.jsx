@@ -68,6 +68,7 @@ export default function SectorStudio() {
     separateItem,
     removeItem,
     toggleVisibility,
+    toggleMainFloor,
     undo,
     redo,
     copyItem,
@@ -484,7 +485,7 @@ export default function SectorStudio() {
       />
 
       {/* ── As 3 Seções do Studio (Cenário 3D, Outliner e Inspector) ── */}
-      <div className="flex-1 min-h-0 p-2 pt-2 grid grid-cols-[1fr_280px] grid-rows-[1fr_1.2fr] gap-2">
+      <div className="flex-1 min-h-0 p-2 pt-2 grid grid-cols-[1fr_280px] grid-rows-[1fr_1fr] gap-2">
         {/* ── Seção Esquerda: Cenário 3D (Cobre a altura total - rows 1 e 2) ── */}
         <div
           ref={viewportRef}
@@ -499,6 +500,9 @@ export default function SectorStudio() {
             onResetCamera={handleResetCamera}
             onAddItem={addItem}
             onJoinModels={joinItems}
+            onDelete={() => {
+              if (selectedIds.length > 0 || selectedId) removeItem(selectedId);
+            }}
             isAddMenuOpen={contextMenu.isOpen}
             setIsAddMenuOpen={(open) =>
               setContextMenu((prev) => ({
@@ -586,13 +590,22 @@ export default function SectorStudio() {
             selectedId={selectedId}
             selectedIds={selectedIds}
             onSelect={(id, isMulti) => {
-              setSelectedId(id, isMulti);
+              if (Array.isArray(id)) {
+                setSelectedIds(id);
+              } else {
+                setSelectedId(id, isMulti);
+              }
+              setTransformMode("translate");
+            }}
+            onSelectMultiple={(ids) => {
+              setSelectedIds(ids);
               setTransformMode("translate");
             }}
             onToggleVisibility={toggleVisibility}
             onDuplicate={duplicateItem}
             onUpdateName={updateName}
             onUpdateProps={updateProps}
+            onToggleMainFloor={toggleMainFloor}
             onSave={handleSaveScene}
             saveStatus={saveStatus}
             saveMessage={saveMessage}
@@ -605,6 +618,7 @@ export default function SectorStudio() {
         <div className="col-start-2 row-start-2 relative w-full h-full min-h-0 min-w-0 rounded-lg overflow-hidden border border-white/[0.08] bg-[#1e1e21] flex flex-col">
           <ModelProperties
             item={selectedItem}
+            items={items}
             onUpdateTransform={updateTransform}
             onUpdateProps={updateProps}
             onUpdateName={updateName}

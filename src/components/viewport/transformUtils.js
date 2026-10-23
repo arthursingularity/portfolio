@@ -51,6 +51,18 @@ export function getModelLocalCenter(node, item) {
     case "pallet":
       h = 0.15;
       break;
+    case "ulma_m": {
+      const count = item.props?.boxCount ?? item.props?.count ?? 12;
+      const tiers = Math.ceil(count / 2);
+      h = Math.max(0.2, tiers * 0.36);
+      break;
+    }
+    case "ulma_p": {
+      const count = item.props?.boxCount ?? item.props?.count ?? 24;
+      const tiers = Math.ceil(count / 2);
+      h = Math.max(0.2, tiers * 0.18);
+      break;
+    }
     case "box": {
       const count = item.props?.count ?? item.props?.maxHeight ?? 6;
       h = Math.max(0.2, count * 0.24);

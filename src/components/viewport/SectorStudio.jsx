@@ -10,8 +10,9 @@ import FloorMarkingPopup from "../configPopups/FloorMarkingPopup";
 import FpsCounter from "./FpsCounter";
 import TopBar from "./TopBar";
 import { useSectorState } from "./sectorState";
-import { saveSectorGlb } from "./exportGlb";
+import { saveSectorGlb, importProjectFile } from "./exportGlb";
 import LeftBar, { isModelResizable } from "./LeftBar";
+import { Icon } from "@iconify/react";
 
 export default function SectorStudio() {
   const [cellSize, setCellSize] = useState(1);
@@ -69,17 +70,72 @@ export default function SectorStudio() {
     removeItem,
     toggleVisibility,
     toggleMainFloor,
+    loadTemplate,
+    loadProject,
     undo,
     redo,
     copyItem,
     pasteItem,
   } = useSectorState();
 
+  const fileInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+
+  const triggerImportProject = useCallback(() => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  }, []);
+
+  const handleImportFile = useCallback(
+    async (file) => {
+      if (!file) return;
+      try {
+        setSaveStatus("saving");
+        setSaveMessage(`Carregando ${file.name}...`);
+        const result = await importProjectFile(file);
+        if (result.success && Array.isArray(result.items)) {
+          loadProject({
+            projectName: result.projectName,
+            items: result.items,
+          });
+          if (result.projectName) {
+            setProjectName(result.projectName);
+          }
+          setSaveStatus("success");
+          setSaveMessage(
+            `Projeto '${result.projectName}' carregado com sucesso (${result.items.length} objetos)!`
+          );
+          setTimeout(() => {
+            setSaveStatus("idle");
+            setSaveMessage("");
+          }, 3500);
+        } else {
+          throw new Error(
+            result.error || "Não foi possível carregar o projeto do arquivo."
+          );
+        }
+      } catch (err) {
+        console.error("Erro na importação:", err);
+        setSaveStatus("error");
+        setSaveMessage(err.message || "Falha ao importar arquivo.");
+        setTimeout(() => {
+          setSaveStatus("idle");
+          setSaveMessage("");
+        }, 4500);
+      }
+    },
+    [loadProject]
+  );
+
+
   const handleSaveScene = async (customFilename) => {
     if (saveStatus === "saving") return;
     try {
       setSaveStatus("saving");
-      setSaveMessage("Gerando GLB...");
+      setSaveMessage("Salvando projeto .glb...");
 
       const nameToUse = (
         customFilename ||
@@ -90,13 +146,22 @@ export default function SectorStudio() {
         ? nameToUse
         : `${nameToUse}.glb`;
 
-      const result = await saveSectorGlb({
+      const projectData = {
+        version: 2,
+        format: "sector_studio_project",
+        savedAt: new Date().toISOString(),
+        projectName: nameToUse.replace(/\.glb$/i, ""),
+        items,
+      };
+
+      await saveSectorGlb({
         exportGroup: exportGroupRef.current,
         filename,
+        projectData,
       });
 
       setSaveStatus("success");
-      setSaveMessage(`Download de ${filename} concluído!`);
+      setSaveMessage(`Projeto ${filename} salvo com sucesso!`);
       setTimeout(() => {
         setSaveStatus("idle");
         setSaveMessage("");
@@ -104,11 +169,47 @@ export default function SectorStudio() {
     } catch (err) {
       console.error("Erro ao salvar cenário:", err);
       setSaveStatus("error");
-      setSaveMessage(err.message || "Erro ao salvar .glb");
+      setSaveMessage(err.message || "Erro ao salvar projeto .glb");
       setTimeout(() => {
         setSaveStatus("idle");
         setSaveMessage("");
       }, 4000);
+    }
+  };
+
+  const handleDragEnter = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingFile(true);
+    }
+  };
+
+  const handleDragLeave = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setIsDraggingFile(false);
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDraggingFile(false);
+
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      handleImportFile(files[0]);
     }
   };
 
@@ -190,6 +291,16 @@ export default function SectorStudio() {
         e.preventDefault();
         joinItems();
       }
+      // Ctrl + S (Salvar projeto .glb)
+      else if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        handleSaveScene();
+      }
+      // Ctrl + O (Abrir / Importar projeto)
+      else if ((e.ctrlKey || e.metaKey) && (e.key === "o" || e.key === "O")) {
+        e.preventDefault();
+        triggerImportProject();
+      }
       // Shift + A (Menu de adicionar)
       else if (e.shiftKey && (e.key === "a" || e.key === "A")) {
         e.preventDefault();
@@ -204,22 +315,22 @@ export default function SectorStudio() {
         e.key === "b" ||
         e.key === "B"
       ) {
+        e.preventDefault();
         setTransformMode("select");
         setIsModalGrab(false);
         setAxisLock(null);
-      } else if (e.key === "g" || e.key === "G") {
-        const hasSelection = (selectedIds && selectedIds.length > 0) || selectedId;
-        if (hasSelection) {
-          e.preventDefault();
-          setTransformMode("translate");
-          setIsModalGrab(false);
-          setAxisLock(null);
-        }
-      } else if (e.key === "t" || e.key === "T") {
+      } else if (
+        e.key === "g" ||
+        e.key === "G" ||
+        e.key === "t" ||
+        e.key === "T"
+      ) {
+        e.preventDefault();
         setTransformMode("translate");
         setIsModalGrab(false);
         setAxisLock(null);
       } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
         setTransformMode("rotate");
         setIsModalGrab(false);
         setAxisLock(null);
@@ -448,13 +559,21 @@ export default function SectorStudio() {
   };
 
   return (
-    <div className="relative w-screen h-screen overflow-hidden bg-[#111115] flex flex-col font-sans">
+    <div
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      className="relative w-screen h-screen overflow-hidden bg-[#111115] flex flex-col font-sans"
+    >
       {/* ── Barra Superior Estilo Blender (Fica acima das 3 Seções) ── */}
       <TopBar
         projectName={projectName}
         setProjectName={setProjectName}
         saveStatus={saveStatus}
         onSave={() => handleSaveScene()}
+        onImportProject={triggerImportProject}
+        onNewProject={loadTemplate}
         onUndo={undo}
         onRedo={redo}
         onAddItem={addItem}
@@ -607,6 +726,7 @@ export default function SectorStudio() {
             onUpdateProps={updateProps}
             onToggleMainFloor={toggleMainFloor}
             onSave={handleSaveScene}
+            onImportProject={triggerImportProject}
             saveStatus={saveStatus}
             saveMessage={saveMessage}
             projectName={projectName}
@@ -630,6 +750,59 @@ export default function SectorStudio() {
           />
         </div>
       </div>
+
+      {/* Input de arquivo invisível para Importar Projeto */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".glb,.gltf"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) handleImportFile(file);
+        }}
+      />
+
+      {/* Overlay minimalista de Drag & Drop */}
+      {isDraggingFile && (
+        <div className="absolute inset-0 z-[100] bg-black/80 backdrop-blur-sm border-2 border-dashed border-blue-400/80 m-3 rounded-xl flex flex-col items-center justify-center gap-2.5 pointer-events-none select-none">
+          <Icon
+            icon="carbon:cloud-upload"
+            className="text-blue-400 text-5xl animate-bounce"
+          />
+          <div className="text-white text-sm font-medium">
+            Solte o arquivo do projeto (.glb) aqui
+          </div>
+          <div className="text-white/50 text-[11px]">
+            O cenário e todas as configurações dos modelos serão restaurados.
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification (Vercel Style) */}
+      {saveStatus !== "idle" && saveMessage && (
+        <div className="absolute bottom-5 right-5 z-50 flex items-center gap-2 px-3 py-2 rounded-md bg-[#18181b]/95 border border-white/[0.12] text-xs shadow-2xl backdrop-blur-md select-none animate-in fade-in slide-in-from-bottom-2 duration-150">
+          {saveStatus === "saving" && (
+            <Icon
+              icon="carbon:progress-bar-round"
+              className="animate-spin text-blue-400 text-sm"
+            />
+          )}
+          {saveStatus === "success" && (
+            <Icon
+              icon="carbon:checkmark-filled"
+              className="text-emerald-400 text-sm"
+            />
+          )}
+          {saveStatus === "error" && (
+            <Icon
+              icon="carbon:warning-filled"
+              className="text-red-400 text-sm"
+            />
+          )}
+          <span className="text-white/90 font-medium">{saveMessage}</span>
+        </div>
+      )}
     </div>
   );
 }

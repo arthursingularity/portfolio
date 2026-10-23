@@ -139,3 +139,34 @@ export function createBoxMaterial(hex = DEFAULT_BOX_COLOR, seedBase = 1, index =
     wireframe,
   });
 }
+
+// ---------------------------------------------------------------------------
+// MODELOS ULMA M E ULMA P (Configurações didáticas em seus próprios arquivos)
+// ---------------------------------------------------------------------------
+export {
+  LARGURA_BASE as ULMA_M_LARGURA_BASE,
+  COMPRIMENTO_BASE as ULMA_M_COMPRIMENTO_BASE,
+  ALTURA_BASE as ULMA_M_ALTURA_BASE,
+  LARGURA as ULMA_M_LARGURA,
+  COMPRIMENTO as ULMA_M_COMPRIMENTO,
+  ALTURA as ULMA_M_ALTURA,
+  GAP_COLUNAS as ULMA_GAP,
+  MAX_BOXES as MAX_ULMA_M_BOXES,
+  NUM_ANDARES as ULMA_M_TIERS,
+  COR_BASE as ULMA_BASE_COLOR,
+  computeUlmaColor,
+  createUlmaMaterial,
+} from "./UlmaMModel";
+
+export {
+  LARGURA_BASE as ULMA_P_LARGURA_BASE,
+  COMPRIMENTO_BASE as ULMA_P_COMPRIMENTO_BASE,
+  ALTURA_BASE as ULMA_P_ALTURA_BASE,
+  LARGURA as ULMA_P_LARGURA,
+  COMPRIMENTO as ULMA_P_COMPRIMENTO,
+  ALTURA as ULMA_P_ALTURA,
+  MAX_BOXES as MAX_ULMA_P_BOXES,
+  NUM_ANDARES as ULMA_P_TIERS,
+} from "./UlmaPModel";
+
+

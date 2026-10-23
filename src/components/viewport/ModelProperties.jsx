@@ -51,19 +51,19 @@ export default function ModelProperties({
     return false;
   }, [item, items]);
 
-  useEffect(() => {
-    if (item?.name) {
-      setLocalName(item.name);
-    }
-  }, [item?.id, item?.name]);
+  const [prevItemId, setPrevItemId] = useState(item?.id);
+  const [prevItemName, setPrevItemName] = useState(item?.name);
 
-  useEffect(() => {
+  if (item?.id !== prevItemId || (item?.name && item.name !== prevItemName && localName === prevItemName)) {
+    setPrevItemId(item?.id);
+    setPrevItemName(item?.name);
+    setLocalName(item?.name || "");
     if (item?.type === "drawer_g") {
       setDrawerDividersInput(
         item.props?.dividers !== undefined ? item.props.dividers : 1
       );
     }
-  }, [item?.id, item?.props?.dividers]);
+  }
 
   const handleGenerateDividers = () => {
     if (!item || item.type !== "drawer_g") return;
@@ -168,13 +168,31 @@ export default function ModelProperties({
       <div className="p-3 flex-1 min-h-0 flex flex-col gap-3 text-xs overflow-y-auto">
         {/* Specific Object Customization */}
         {/* ─── Propriedades do Pallet ─── */}
+        {/* ─── Propriedades do Pallet ─── */}
         {item.type === "pallet" && (() => {
+          const boxType = item.props?.boxType || "branca";
+          const maxBoxes = boxType === "ulma_m" ? 12 : boxType === "ulma_p" ? 24 : 30;
+          const boxesPerTier = boxType === "branca" ? 5 : 2;
+
           const currentBoxes =
             item.props?.boxCount !== undefined && item.props?.boxCount !== ""
               ? item.props.boxCount
               : 0;
-          const numBoxes = Math.min(30, Math.max(0, parseInt(currentBoxes, 10) || 0));
-          const layers = Math.ceil(numBoxes / 5);
+          const numBoxes = Math.min(maxBoxes, Math.max(0, parseInt(currentBoxes, 10) || 0));
+          const layers = Math.ceil(numBoxes / boxesPerTier);
+          const tierWord =
+            boxType === "branca"
+              ? (layers === 1 ? "camada" : "camadas")
+              : (layers === 1 ? "andar" : "andares");
+
+          const handleBoxTypeChange = (newType) => {
+            const newMax = newType === "ulma_m" ? 12 : newType === "ulma_p" ? 24 : 30;
+            const currentNum = parseInt(item.props?.boxCount, 10) || 0;
+            onUpdateProps(item.id, {
+              boxType: newType,
+              boxCount: Math.min(newMax, currentNum),
+            });
+          };
 
           const handleBoxCountChange = (val) => {
             if (val === "") {
@@ -184,7 +202,7 @@ export default function ModelProperties({
             const num = parseInt(val, 10);
             if (!isNaN(num)) {
               onUpdateProps(item.id, {
-                boxCount: Math.min(30, Math.max(0, num)),
+                boxCount: Math.min(maxBoxes, Math.max(0, num)),
               });
             }
           };
@@ -194,8 +212,59 @@ export default function ModelProperties({
             (c) => c.hex.toUpperCase() === currentBoxColor.toUpperCase()
           );
 
+          // Presets adaptados ao tipo
+          const presets =
+            boxType === "ulma_m"
+              ? [0, 2, 4, 6, 8, 10, 12]
+              : boxType === "ulma_p"
+              ? [0, 4, 8, 12, 16, 20, 24]
+              : [0, 5, 10, 15, 20, 25, 30];
+
           return (
             <div className="flex flex-col gap-3">
+              {/* Seletor de Tipo de Caixa */}
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[12px] text-neutral-400 font-medium">
+                  Tipo de Caixa
+                </span>
+                <div className="grid grid-cols-3 gap-1 bg-[#121214] p-0.5 rounded border border-white/[0.08]">
+                  <button
+                    type="button"
+                    onClick={() => handleBoxTypeChange("branca")}
+                    className={`py-1.5 px-1 rounded text-[11px] font-medium cursor-pointer text-center ${
+                      boxType === "branca"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    Caixa Branca
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBoxTypeChange("ulma_m")}
+                    className={`py-1.5 px-1 rounded text-[11px] font-medium cursor-pointer text-center ${
+                      boxType === "ulma_m"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    Ulma M
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleBoxTypeChange("ulma_p")}
+                    className={`py-1.5 px-1 rounded text-[11px] font-medium cursor-pointer text-center ${
+                      boxType === "ulma_p"
+                        ? "bg-white text-black font-semibold shadow-xs"
+                        : "text-white/60 hover:text-white hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    Ulma P
+                  </button>
+                </div>
+              </div>
+
+              {/* Controles de Quantidade */}
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] text-neutral-400 font-medium">
@@ -204,7 +273,7 @@ export default function ModelProperties({
                   <span className="text-[11px] font-mono text-neutral-400 tabular-nums">
                     {numBoxes === 0
                       ? "Vazio (0 caixas)"
-                      : `${numBoxes} un • ${layers} ${layers === 1 ? "camada" : "camadas"}`}
+                      : `${numBoxes} un • ${layers} ${tierWord}`}
                   </span>
                 </div>
 
@@ -214,7 +283,7 @@ export default function ModelProperties({
                     type="button"
                     disabled={numBoxes <= 0}
                     onClick={() => handleBoxCountChange(Math.max(0, numBoxes - 1))}
-                    className="w-7 h-[28px] flex items-center justify-center bg-[#121214] border border-white/[0.08] hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed rounded text-white/80 hover:text-white  cursor-pointer shrink-0"
+                    className="w-7 h-[28px] flex items-center justify-center bg-[#121214] border border-white/[0.08] hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed rounded text-white/80 hover:text-white cursor-pointer shrink-0"
                     title="Diminuir 1 caixa"
                   >
                     <Icon icon="lucide:minus" className="text-xs" />
@@ -224,14 +293,14 @@ export default function ModelProperties({
                     <input
                       type="number"
                       min="0"
-                      max="30"
+                      max={maxBoxes}
                       step="1"
                       value={currentBoxes}
                       onChange={(e) => handleBoxCountChange(e.target.value)}
                       onBlur={() => {
                         const parsed = parseInt(item.props?.boxCount, 10);
                         onUpdateProps(item.id, {
-                          boxCount: isNaN(parsed) ? 0 : Math.min(30, Math.max(0, parsed)),
+                          boxCount: isNaN(parsed) ? 0 : Math.min(maxBoxes, Math.max(0, parsed)),
                         });
                       }}
                       placeholder="0"
@@ -244,21 +313,21 @@ export default function ModelProperties({
 
                   <button
                     type="button"
-                    disabled={numBoxes >= 30}
-                    onClick={() => handleBoxCountChange(Math.min(30, numBoxes + 1))}
-                    className="w-7 h-[28px] flex items-center justify-center bg-[#121214] border border-white/[0.08] hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed rounded text-white/80 hover:text-white  cursor-pointer shrink-0"
+                    disabled={numBoxes >= maxBoxes}
+                    onClick={() => handleBoxCountChange(Math.min(maxBoxes, numBoxes + 1))}
+                    className="w-7 h-[28px] flex items-center justify-center bg-[#121214] border border-white/[0.08] hover:border-white/25 disabled:opacity-30 disabled:cursor-not-allowed rounded text-white/80 hover:text-white cursor-pointer shrink-0"
                     title="Aumentar 1 caixa"
                   >
                     <Icon icon="lucide:plus" className="text-xs" />
                   </button>
                 </div>
 
-                {/* Slider visual de 0 a 30 */}
+                {/* Slider visual de 0 a maxBoxes */}
                 <div className="flex items-center gap-2 pt-0.5">
                   <input
                     type="range"
                     min="0"
-                    max="30"
+                    max={maxBoxes}
                     step="1"
                     value={numBoxes}
                     onChange={(e) => handleBoxCountChange(e.target.value)}
@@ -269,21 +338,25 @@ export default function ModelProperties({
                 {/* Presets Rápidos por Nível / Camada */}
                 <div className="flex flex-col gap-1 pt-1">
                   <span className="text-[10px] text-neutral-500 font-mono">
-                    Atalhos por Camada (5 caixas / nível):
+                    {boxType === "branca"
+                      ? "Atalhos por Camada (5 caixas / nível):"
+                      : "Atalhos por Andar (2 caixas / nível):"}
                   </span>
                   <div className="grid grid-cols-7 gap-1">
-                    {[0, 5, 10, 15, 20, 25, 30].map((preset) => {
+                    {presets.map((preset) => {
                       const isActive = numBoxes === preset;
+                      const levelNum = preset / boxesPerTier;
                       return (
                         <button
                           key={preset}
                           type="button"
                           onClick={() => handleBoxCountChange(preset)}
-                          className={`py-1 rounded border text-[11px] font-mono tabular-nums  cursor-pointer ${isActive
-                            ? "bg-white border-white text-black font-semibold shadow-sm"
-                            : "bg-[#121214] border-white/[0.08] text-white/60 hover:text-white hover:border-white/25"
-                            }`}
-                          title={`${preset} caixas (${preset / 5} ${preset / 5 === 1 ? "camada" : "camadas"})`}
+                          className={`py-1 rounded border text-[11px] font-mono tabular-nums cursor-pointer ${
+                            isActive
+                              ? "bg-white border-white text-black font-semibold shadow-xs"
+                              : "bg-[#121214] border-white/[0.08] text-white/60 hover:text-white hover:border-white/25"
+                          }`}
+                          title={`${preset} caixas (${levelNum} ${levelNum === 1 ? tierWord : tierWord})`}
                         >
                           {preset}
                         </button>
@@ -296,41 +369,45 @@ export default function ModelProperties({
               {/* Linha divisória */}
               <div className="h-[1px] w-auto bg-neutral-700/70 my-0.5" />
 
-              {/* ─── Cor das Caixas do Pallet ─── */}
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-[12px] text-neutral-400 font-medium">
-                    Cor das Caixas
-                  </span>
-                  <span className="text-[11px] font-mono text-neutral-400 tabular-nums uppercase">
-                    {selectedColorDef ? selectedColorDef.name : currentBoxColor}
-                  </span>
-                </div>
+              {/* ─── Cor das Caixas do Pallet (Apenas Caixa Branca) ─── */}
+              {boxType === "branca" ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[12px] text-neutral-400 font-medium">
+                      Cor das Caixas
+                    </span>
+                    <span className="text-[11px] font-mono text-neutral-400 tabular-nums uppercase">
+                      {selectedColorDef ? selectedColorDef.name : currentBoxColor}
+                    </span>
+                  </div>
 
-                {/* Presets Rápidos de Cores das Caixas */}
-                <div className="grid grid-cols-6 gap-1.5">
-                  {BOX_PALETTE_COLORS.map((c) => {
-                    const isSelected =
-                      currentBoxColor.toUpperCase() === c.hex.toUpperCase();
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        title={`${c.name} (${c.hex})`}
-                        onClick={() =>
-                          onUpdateProps(item.id, { boxColor: c.hex })
-                        }
-                        className={`h-7 rounded border  cursor-pointer flex items-center justify-center relative ${isSelected
-                          ? "border-white ring-1 ring-white scale-[1.03]"
-                          : "border-white/10 hover:border-white/40 opacity-80 hover:opacity-100"
+                  {/* Presets Rápidos de Cores das Caixas */}
+                  <div className="grid grid-cols-6 gap-1.5">
+                    {BOX_PALETTE_COLORS.map((c) => {
+                      const isSelected =
+                        currentBoxColor.toUpperCase() === c.hex.toUpperCase();
+                      return (
+                        <button
+                          key={c.id}
+                          type="button"
+                          title={`${c.name} (${c.hex})`}
+                          onClick={() =>
+                            onUpdateProps(item.id, { boxColor: c.hex })
+                          }
+                          className={`h-7 rounded border cursor-pointer flex items-center justify-center relative ${
+                            isSelected
+                              ? "border-white ring-1 ring-white scale-[1.03]"
+                              : "border-white/10 hover:border-white/40 opacity-80 hover:opacity-100"
                           }`}
-                        style={{ backgroundColor: c.hex }}
-                      >
-                      </button>
-                    );
-                  })}
+                          style={{ backgroundColor: c.hex }}
+                        />
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <></>
+              )}
             </div>
           );
         })()}
@@ -1070,8 +1147,6 @@ export default function ModelProperties({
                           rail: nextRail,
                           trilho: nextRail,
                           varal: nextRail ? Boolean(item.props.varal) : false,
-                          doubleRail: nextRail ? Boolean(item.props.doubleRail || item.props.trilhoDuplo) : false,
-                          trilhoDuplo: nextRail ? Boolean(item.props.doubleRail || item.props.trilhoDuplo) : false,
                         });
                       }}
                       className="w-4 h-4 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300"
@@ -1108,17 +1183,10 @@ export default function ModelProperties({
                     />
                   </label>
 
-                  {/* Checkbox Trilho Duplo (habilitado apenas quando Trilho estiver marcado) */}
+                  {/* Checkbox Duplo (independente de Trilho e Varal) */}
                   <label
-                    className={`w-full flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20  ${Boolean(item.props.rail || item.props.trilho)
-                      ? "hover:bg-white/[0.04] cursor-pointer group"
-                      : "opacity-40 cursor-not-allowed"
-                      }`}
-                    title={
-                      Boolean(item.props.rail || item.props.trilho)
-                        ? "Ativar/desativar trilho duplo (+1 fileira)"
-                        : "O trilho duplo só pode ser marcado quando o Trilho estiver ativo"
-                    }
+                    className="w-full flex items-center justify-between py-1 px-1.5 rounded border border-white/[0.06] bg-black/20 hover:bg-white/[0.04] cursor-pointer group"
+                    title="Ativar/desativar fileira dupla (+1 fileira de caixas)"
                   >
                     <span className="text-[11px] text-white/80 group-hover:text-white font-medium">
                       Duplo
@@ -1126,10 +1194,8 @@ export default function ModelProperties({
                     <input
                       type="checkbox"
                       id="box-double-rail-toggle"
-                      disabled={!Boolean(item.props.rail || item.props.trilho)}
                       checked={Boolean(
-                        (item.props.rail || item.props.trilho) &&
-                        (item.props.doubleRail || item.props.trilhoDuplo)
+                        item.props.doubleRail || item.props.trilhoDuplo
                       )}
                       onChange={(e) => {
                         const nextDouble = e.target.checked;
@@ -1138,7 +1204,7 @@ export default function ModelProperties({
                           trilhoDuplo: nextDouble,
                         });
                       }}
-                      className="w-4 h-4 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300 disabled:cursor-not-allowed"
+                      className="w-4 h-4 rounded border border-white/20 bg-neutral-900 text-[#FF6600] focus:ring-0 cursor-pointer accent-primary-300"
                     />
                   </label>
                 </div>

@@ -19,6 +19,8 @@ import {
   resolveSeedBase,
   createBoxMaterial,
 } from "./boxConfig";
+import UlmaMModel from "./UlmaMModel";
+import UlmaPModel from "./UlmaPModel";
 
 // Re-exporta para manter compatibilidade
 export { FATOR_ESCALA, CAIXA_COMPRIMENTO, CAIXA_LARGURA, CAIXA_ALTURA };
@@ -35,7 +37,10 @@ export const PALLET_HEIGHT = 0.11000 * FATOR_ESCALA; // ~0.2348m (Eixo Y)
  * - 9 blocos espaçadores (3x3) formando os vãos laterais e frontais da empilhadeira
  * - 3 longarinas inferiores longitudinais (eixo Z) formando as 4 janelas inferiores
  * - Geometria fundida em 1 único draw call (Zero GC)
- * - Suporte a caixas brancas com dimensões e tonalidades HSL idênticas ao BoxModel
+ * - Suporte a múltiplos tipos de caixas:
+ *   1. Caixa Branca (padrão 5 por camada, max 30)
+ *   2. Ulma M (Caixa Cinza Padrão: 2 colunas de 6 andares = 12 caixas)
+ *   3. Ulma P (Nova Caixa Cinza Fina: 2 colunas de 12 andares = 24 caixas)
  */
 export default function PalletModel({
   width = PALLET_WIDTH,
@@ -43,6 +48,7 @@ export default function PalletModel({
   height = PALLET_HEIGHT,
   color = "#c49a67",
   wireframe = false,
+  boxType = "branca",
   boxCount = 0,
   boxColor = DEFAULT_BOX_COLOR,
   itemId = null,
@@ -51,11 +57,6 @@ export default function PalletModel({
   seed = null,
   position = null,
 }) {
-  const instanceSeed = useMemo(
-    () => Math.floor(Math.random() * 1000000) + 1,
-    []
-  );
-
   const seedBase = useMemo(() => {
     return resolveSeedBase({
       colorSeed,
@@ -63,9 +64,9 @@ export default function PalletModel({
       itemId,
       modelId,
       position,
-      fallbackSeed: instanceSeed,
+      fallbackSeed: 12345,
     });
-  }, [colorSeed, seed, itemId, modelId, position, instanceSeed]);
+  }, [colorSeed, seed, itemId, modelId, position]);
 
   const palletMaterial = useMemo(
     () =>
@@ -170,7 +171,10 @@ export default function PalletModel({
     []
   );
 
+  const currentBoxType = boxType || "branca";
+
   const boxInstances = useMemo(() => {
+    if (currentBoxType !== "branca") return [];
     const validCount = Math.min(MAX_PALLET_BOXES, Math.max(0, parseInt(boxCount, 10) || 0));
     if (validCount <= 0) return [];
 
@@ -217,19 +221,44 @@ export default function PalletModel({
         material: mat,
       };
     });
-  }, [boxCount, height, boxColor, seedBase, wireframe]);
+  }, [currentBoxType, boxCount, height, boxColor, seedBase, wireframe]);
 
   return (
     <group position={[0, 0, 0]}>
       <mesh geometry={palletGeo} material={palletMaterial} />
-      {boxInstances.map((box, idx) => (
-        <mesh
-          key={idx}
-          geometry={box.isVertical ? geomVertical : geomHorizontal}
-          material={box.material}
-          position={box.position}
+      {currentBoxType === "ulma_m" && (
+        <UlmaMModel
+          boxCount={boxCount}
+          baseY={height}
+          wireframe={wireframe}
+          itemId={itemId}
+          modelId={modelId}
+          colorSeed={colorSeed}
+          seed={seed}
+          position={position}
         />
-      ))}
+      )}
+      {currentBoxType === "ulma_p" && (
+        <UlmaPModel
+          boxCount={boxCount}
+          baseY={height}
+          wireframe={wireframe}
+          itemId={itemId}
+          modelId={modelId}
+          colorSeed={colorSeed}
+          seed={seed}
+          position={position}
+        />
+      )}
+      {currentBoxType === "branca" &&
+        boxInstances.map((box, idx) => (
+          <mesh
+            key={idx}
+            geometry={box.isVertical ? geomVertical : geomHorizontal}
+            material={box.material}
+            position={box.position}
+          />
+        ))}
     </group>
   );
 }

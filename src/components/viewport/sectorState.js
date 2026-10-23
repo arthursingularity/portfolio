@@ -247,7 +247,7 @@ export function useSectorState() {
         case "pallet":
           newItem.name = "Pallet Madeira";
           newItem.position = [...spawnPos];
-          newItem.props = { boxCount: 0 };
+          newItem.props = { boxCount: 0, boxType: "branca" };
           break;
         case "cargo_red":
           newItem.name = "Carga Vermelha";
@@ -1443,6 +1443,44 @@ export function useSectorState() {
     setSelectedIds([]);
   }, [items, pushHistory]);
 
+  // Load complete project from imported .glb or .json
+  const loadProject = useCallback(
+    (project) => {
+      if (!project || !Array.isArray(project.items)) return false;
+      pushHistory(items);
+
+      let hasMainFloor = false;
+      const sanitizedList = project.items.map((item) => {
+        if (item?.type === "floor") {
+          const isMain = Boolean(
+            item.isMainFloor || item.props?.isMain || item.props?.isMainFloor
+          );
+          const active = isMain && !hasMainFloor;
+          if (active) hasMainFloor = true;
+          return {
+            ...item,
+            isMainFloor: active,
+            props: {
+              ...item.props,
+              markingMode: false,
+              isMain: active,
+              isMainFloor: active,
+            },
+          };
+        }
+        return item?.props?.markingMode
+          ? { ...item, props: { ...item.props, markingMode: false } }
+          : item;
+      });
+
+      const finalItems = sanitizeBoxGroups(sanitizedList);
+      setItems(finalItems);
+      setSelectedIds([]);
+      return true;
+    },
+    [items, pushHistory]
+  );
+
   const selectedItem = items.find((it) => it.id === selectedId) || null;
   const selectedItems = items.filter((it) => selectedIds.includes(it.id));
 
@@ -1472,6 +1510,7 @@ export function useSectorState() {
     toggleMainFloor,
     clearAll,
     loadTemplate,
+    loadProject,
     undo,
     redo,
     copyItem,

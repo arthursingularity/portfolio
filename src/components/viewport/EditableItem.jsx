@@ -10,6 +10,8 @@ import WallModel from "./models/WallModel";
 import BarModel from "./models/BarModel";
 import CubeModel from "./models/CubeModel";
 import JoinedModel from "./models/JoinedModel";
+import UlmaMModel from "./models/UlmaMModel";
+import UlmaPModel from "./models/UlmaPModel";
 import HoverBoundingBox from "./HoverBoundingBox";
 
 export default function EditableItem({
@@ -45,11 +47,7 @@ export default function EditableItem({
   const [localHovered, setLocalHovered] = useState(false);
   const transformRef = useRef(null);
 
-  const isHoverBlocked =
-    Boolean(isTransforming) ||
-    Boolean(isTransformingRef?.current) ||
-    Boolean(justFinishedTransformRef?.current) ||
-    Boolean(isModalGrab);
+  const isHoverBlocked = Boolean(isTransforming) || Boolean(isModalGrab);
 
   const isHovered = !isHoverBlocked
     ? isHoveredProp !== undefined
@@ -57,11 +55,7 @@ export default function EditableItem({
       : localHovered
     : false;
 
-  useEffect(() => {
-    if (isHoverBlocked) {
-      setLocalHovered(false);
-    }
-  }, [isHoverBlocked]);
+
 
   const callbacksRef = useRef({
     onTransformStart,
@@ -154,6 +148,24 @@ export default function EditableItem({
         return <CubeModel {...item.props} />;
       case "joined":
         return <JoinedModel {...item.props} />;
+      case "ulma_m":
+        return (
+          <UlmaMModel
+            {...item.props}
+            itemId={item.id}
+            modelId={item.id}
+            position={item.position}
+          />
+        );
+      case "ulma_p":
+        return (
+          <UlmaPModel
+            {...item.props}
+            itemId={item.id}
+            modelId={item.id}
+            position={item.position}
+          />
+        );
       default:
         return null;
     }
@@ -220,6 +232,7 @@ export default function EditableItem({
         {(isHovered || isSelected) && target && !item.props?.markingMode && (
           <HoverBoundingBox
             target={target}
+            item={item}
             itemProps={item.props}
             color="#38bdf8"
           />

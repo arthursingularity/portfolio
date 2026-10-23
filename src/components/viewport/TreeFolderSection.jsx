@@ -25,6 +25,7 @@ export default function TreeFolderSection({
   onUpdateProps,
   onToggleMainFloor,
   onSave,
+  onImportProject,
   saveStatus = "idle",
   saveMessage = "",
   projectName = "setor_principal",
@@ -347,6 +348,9 @@ export default function TreeFolderSection({
         return <Icon icon="lucide:inbox" className="text-[14px] text-neutral-400" />;
       case "joined":
         return <Icon icon="iconoven:blend-mode" className="text-[14px] text-primary-400" />;
+      case "ulma_m":
+      case "ulma_p":
+        return <Icon icon="lucide:boxes" className="text-[14px] text-neutral-400" />;
       default:
         return <Icon icon="at-icons:cube" className="text-[14px] text-neutral-400" />;
     }
@@ -696,6 +700,36 @@ export default function TreeFolderSection({
                 >
                   {projectName ? `${projectName}.glb` : "setor_principal.glb"}
                 </span>
+              )}
+            </div>
+
+            {/* Ações rápidas de Salvar e Importar na raiz do projeto .glb */}
+            <div className="flex items-center gap-0.5">
+              {onImportProject && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onImportProject();
+                  }}
+                  className="p-1 rounded hover:bg-white/20 text-white/50 hover:text-white cursor-pointer"
+                  title="Importar projeto (.glb)"
+                >
+                  <Icon icon="carbon:upload" className="text-[13px]" />
+                </button>
+              )}
+              {onSave && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSave();
+                  }}
+                  className="p-1 rounded hover:bg-white/20 text-white/50 hover:text-white cursor-pointer"
+                  title="Salvar projeto (.glb com configurações)"
+                >
+                  <Icon icon="carbon:download" className="text-[13px]" />
+                </button>
               )}
             </div>
           </div>

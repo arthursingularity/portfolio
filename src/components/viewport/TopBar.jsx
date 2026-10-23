@@ -8,6 +8,8 @@ export default function TopBar({
   setProjectName,
   saveStatus = "idle",
   onSave,
+  onImportProject,
+  onNewProject,
   onUndo,
   onRedo,
   onAddItem,
@@ -85,23 +87,35 @@ export default function TopBar({
                   <button
                     type="button"
                     onClick={() => {
-                      if (onSave) onSave();
+                      if (onNewProject) onNewProject();
                       closeMenus();
                     }}
                     className="w-full px-3 py-1 text-left flex items-center justify-between hover:bg-[#34343a] hover:text-white"
                   >
-                    <span>Save</span>
-                    <span className="text-zinc-500 text-[11px]">Ctrl+S</span>
+                    <span>New Scene</span>
+                    <span className="text-zinc-500 text-[11px]">Novo</span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onImportProject) onImportProject();
+                      closeMenus();
+                    }}
+                    className="w-full px-3 py-1 text-left flex items-center justify-between hover:bg-[#34343a] hover:text-white cursor-pointer"
+                  >
+                    <span>Open Project (.glb)</span>
+                    <span className="text-zinc-500 text-[11px]">Ctrl+O</span>
+                  </button>
+                  <div className="h-[1px] bg-white/[0.08] my-1" />
                   <button
                     type="button"
                     onClick={() => {
                       if (onExportGlb) onExportGlb();
                       closeMenus();
                     }}
-                    className="w-full px-3 py-1 text-left flex items-center justify-between hover:bg-[#34343a] hover:text-white"
+                    className="w-full px-3 py-1 text-left flex items-center justify-between hover:bg-[#34343a] hover:text-white cursor-pointer"
                   >
-                    <span>Export glTF 2.0 (.glb)</span>
+                    <span>Export Project (.glb)</span>
                     <span className="text-zinc-500 text-[11px]">Ctrl+E</span>
                   </button>
                   <div className="h-[1px] bg-white/[0.08] my-1" />
